@@ -173,8 +173,3 @@ def train_rqvae(config: RQVAEConfig):
         print(
             "[HF] 未设置 HF_REPO，跳过上传。若需上传，请设置环境变量 HF_REPO 与 HF_TOKEN。"
         )
-
-
-if __name__ == "__main__":
-    rqvae_config = RQVAEConfig()
-    train_rqvae(rqvae_config)

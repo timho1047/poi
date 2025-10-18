@@ -9,6 +9,5 @@ wheels/
 # Virtual environments
 .venv
 
-
-llama3-finetuned/
-llama3-finetuned-lora/
+datasets/
+output/

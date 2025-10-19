@@ -3,9 +3,9 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter  # 用于TensorBoard日志记录
 from tqdm import tqdm
 
-from ..dataset.rqvae import get_dataloader  # 导入自定义 DataLoader 工厂函数
-from ..rqvae.model import RQVAE
-from ..settings import HF_PRIVATE, HF_REPO, HF_TOKEN
+from ...dataset.rqvae import get_dataloader  # 导入自定义 DataLoader 工厂函数
+from ...rqvae.model import RQVAE
+from ...settings import HF_PRIVATE, HF_REPO, HF_TOKEN
 from .config import RQVAEConfig
 from .hf import upload_to_hf
 

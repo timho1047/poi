@@ -1,7 +1,7 @@
 import datetime
 from pathlib import Path
 
-from poi.train.config import RQVAEConfig
+from .config import RQVAEConfig
 
 # 可选：Hugging Face 上传所需依赖
 try:

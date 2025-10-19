@@ -21,6 +21,8 @@ def get_device():
 ROOT_DIR = Path(__file__).parent.parent.parent
 DATASET_DIR = ROOT_DIR / "datasets"
 OUTPUT_DIR = ROOT_DIR / "output"
+CHECKPOINTS_DIR = OUTPUT_DIR / "checkpoints"
+LOGS_DIR = OUTPUT_DIR / "logs"
 
 DEVICE: Literal["cpu", "cuda", "mps"] = os.getenv("DEVICE", get_device())
 RANDOM_STATE = int(os.getenv("RANDOM_STATE", 43))
@@ -33,3 +35,9 @@ RANDOM_STATE = int(os.getenv("RANDOM_STATE", 43))
 HF_REPO = os.getenv("HF_REPO")
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_PRIVATE = os.getenv("HF_PRIVATE", "1") in ("1", "true", "True")
+
+
+
+# Initialize directories
+CHECKPOINTS_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)

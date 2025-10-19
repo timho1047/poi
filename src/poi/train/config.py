@@ -44,8 +44,8 @@ class RQVAEConfig:
         self.dataset_path = settings.DATASET_DIR / self.dataset_name
         self.metadata = json.loads((self.dataset_path / "metadata.json").read_text())
         self.embedding_dim = self.metadata["total_dim"]
-        self.log_dir = settings.OUTPUT_DIR / "runs" / "rqvae" / self.run_name
-        self.checkpoint_dir = settings.OUTPUT_DIR / "checkpoint" / "rqvae" / self.run_name
+        self.log_dir = settings.OUTPUT_DIR / "logs" / "rqvae" / self.run_name
+        self.checkpoint_dir = settings.OUTPUT_DIR / "checkpoints" / "rqvae" / self.run_name
         self.checkpoint_path = self.checkpoint_dir / "rqvae_checkpoint.pt"
         self.checkpoint_best_path = self.checkpoint_dir / "rqvae_best.pt"
         self.code_indices_log_path = self.checkpoint_dir / "code_indices_log.pt"

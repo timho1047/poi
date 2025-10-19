@@ -13,7 +13,7 @@ DataLoader 模块：为 RQ-VAE 训练构建 PyTorch Dataset 和 DataLoader
         pass
 """
 
-import json
+from pathlib import Path
 from typing import Literal
 import os
 import torch
@@ -62,7 +62,7 @@ class POIDataset(Dataset):
 
 
 def get_dataloader(
-    dataset_path: str,
+    dataset_path: Path|str,
     batch_size: int = 128,
     shuffle: bool = True,
     num_workers: int = 4,
@@ -90,7 +90,7 @@ def get_dataloader(
         - persistent_workers=True 可避免反复创建子进程，适合多 epoch 训练
         - 对于纯内存 Tensor 数据，num_workers 带来的收益有限，但不会有负面影响
     """
-    dataset = POIDataset(dataset_root=dataset_path)
+    dataset = POIDataset(dataset_root=str(dataset_path))
     
     # 如果使用 CUDA，开启 pin_memory 可加速 H2D（Host to Device）拷贝
     pin_memory = (device == 'cuda')
@@ -113,44 +113,3 @@ def get_dataloader(
           f"num_workers={num_workers}, pin_memory={pin_memory}, drop_last={drop_last}")
     
     return loader
-
-## Load Dataset and Metadata
-def load_dataset(dataset_name="NYC"):
-    """
-    Load POI features and metadata from the Dataset folder
-
-    Args:
-        dataset_name: One of 'NYC', 'TKY', 'GWL'
-
-    Returns:
-        poi_features: torch.Tensor of shape (num_pois, total_dim)
-        metadata: dict containing dataset information
-        input_dim_map: dict mapping feature names to (dim, k_hot) tuples
-    """
-    dataset_path = os.path.join("..", "Dataset", dataset_name)
-
-    # Load POI features
-    poi_features_path = os.path.join(dataset_path, "poi_features.pt")
-    poi_features = torch.load(poi_features_path)
-    print(f"Loaded {dataset_name} POI features: {poi_features.shape}")
-
-    # Load metadata
-    metadata_path = os.path.join(dataset_path, "metadata.json")
-    with open(metadata_path, "r") as f:
-        metadata = json.load(f)
-
-    print(f"Dataset Info:")
-    print(f"  - Total POIs: {metadata['num_pois']}")
-    print(f"  - Input Dimension: {metadata['total_dim']}")
-    print(f"  - Feature Dimensions: {metadata['feature_dims']}")
-
-    # Create input dimension map based on metadata
-    # For NYC: categories=209, regions=91, temporal=24, collaborative=1083
-    input_dim_map = {
-        "category": (metadata["feature_dims"]["category"], 1),
-        "region": (metadata["feature_dims"]["region"], 1),
-        "temporal": (metadata["feature_dims"]["temporal"], 1),
-        "collaborative": (metadata["feature_dims"]["collaborative"], 10),
-    }
-
-    return poi_features, metadata, input_dim_map

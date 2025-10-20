@@ -16,7 +16,7 @@ from .. import settings
 @dataclass
 class LLMConfig:
     # Settings
-    model_id: str = "mlabonne/Meta-Llama-3-8B"
+    model_id: str = "unsloth/llama-3-8b"
     run_name: str = "llama3-1"
     logging_steps: int = 4
     resume_from_checkpoint: bool = True

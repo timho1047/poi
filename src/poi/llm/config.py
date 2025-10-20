@@ -22,6 +22,7 @@ class LLMConfig:
     resume_from_checkpoint: bool = True
     max_length: int = 2048
     log_level: Literal["debug", "info", "warning", "error", "critical"] = "warning"
+    device: Literal["cpu", "cuda", "mps"] = settings.DEVICE
 
     # Training parameters
     lr: float = 1e-5
@@ -59,6 +60,7 @@ class LLMConfig:
         self.resume_from_checkpoint = (
             len(checkpoint_dirs) > 0 and self.resume_from_checkpoint
         )
+        self.bf16 = self.device == "cuda" and torch.cuda.is_bf16_supported()
 
         self.bnb_config = (
             BNB_CONFIG_8BIT if self.quantization_bits == 8 else BNB_CONFIG_4BIT
@@ -92,8 +94,8 @@ class LLMConfig:
             max_grad_norm=0.3,
             seed=settings.RANDOM_STATE,
             data_seed=settings.RANDOM_STATE,
-            bf16=True,
-            fp16=False,
+            bf16=self.bf16,
+            fp16=not self.bf16,
             # Some speed optimization
             gradient_checkpointing=True,  # Should be default, but make it explicit
             gradient_checkpointing_kwargs={"use_reentrant": False},  # Faster variant

@@ -1,9 +1,12 @@
-from poi.llm import LLMConfig, load_inference_model, inference
+from poi.llm import LLMConfig, load_fast_inference_model, inference
 
+
+instruction_str = "Here is a record of a user's POI accesses, your task is based on the history to predict the POI that the user is likely to access at the specified time."
+input_str = "User_2 visited: <a_26><b_18><c_11><d_1> at 2012-04-20 07:23, <a_31><b_12><c_4> at 2012-04-20 21:32, <a_29><b_13><c_6> at 2012-04-20 21:34, <a_31><b_2><c_27> at 2012-04-21 13:20, <a_0><b_9><c_1> at 2012-04-21 20:45, <a_29><b_13><c_6> at 2012-04-21 22:29, <a_26><b_18><c_10><d_0> at 2012-04-23 06:23, <a_26><b_3><c_8> at 2012-04-23 06:23, <a_26><b_18><c_10><d_1> at 2012-04-23 06:23, <a_26><b_24><c_26> at 2012-04-23 07:16, <a_26><b_18><c_11><d_0> at 2012-04-23 07:17, <a_26><b_18><c_11><d_1> at 2012-04-23 07:17, <a_6><b_0><c_29> at 2012-04-23 07:17, <a_31><b_12><c_4> at 2012-04-23 10:55, <a_26><b_24><c_26> at 2012-04-24 06:59, <a_26><b_18><c_10><d_0> at 2012-04-24 06:59, <a_26><b_18><c_10><d_1> at 2012-04-24 06:59, <a_26><b_3><c_8> at 2012-04-24 06:59, <a_26><b_18><c_11><d_0> at 2012-04-24 07:57, <a_6><b_0><c_29> at 2012-04-24 07:57, <a_26><b_18><c_11><d_1> at 2012-04-24 07:58, <a_31><b_12><c_4> at 2012-04-24 17:13, <a_26><b_18><c_10><d_0> at 2012-04-25 06:46, <a_26><b_18><c_10><d_1> at 2012-04-25 06:46, <a_26><b_3><c_8> at 2012-04-25 06:46, <a_26><b_24><c_26> at 2012-04-25 08:45, <a_26><b_18><c_10><d_0> at 2012-04-25 08:46, <a_26><b_18><c_11><d_0> at 2012-04-25 08:46, <a_6><b_0><c_29> at 2012-04-25 08:46, <a_26><b_18><c_11><d_1> at 2012-04-25 08:47, <a_26><b_18><c_10><d_0> at 2012-04-26 06:44, <a_26><b_24><c_26> at 2012-04-26 06:44, <a_26><b_3><c_8> at 2012-04-26 06:44, <a_26><b_18><c_10><d_1> at 2012-04-26 06:44, <a_6><b_0><c_29> at 2012-04-26 07:40, <a_26><b_18><c_11><d_0> at 2012-04-26 07:40, <a_26><b_18><c_11><d_1> at 2012-04-26 07:41, <a_26><b_18><c_10><d_1> at 2012-04-27 06:08, <a_26><b_3><c_8> at 2012-04-27 06:09, <a_26><b_18><c_10><d_0> at 2012-04-27 06:09, <a_26><b_24><c_26> at 2012-04-27 06:50, <a_26><b_18><c_11><d_1> at 2012-04-27 06:51, <a_29><b_10><c_0> at 2012-04-27 10:14, <a_0><b_15><c_25> at 2012-04-27 10:14, <a_22><b_25><c_16> at 2012-04-27 10:23, <a_23><b_6><c_23> at 2012-04-27 10:24, <a_31><b_12><c_4> at 2012-04-28 21:53, <a_29><b_13><c_6> at 2012-04-28 21:54, <a_31><b_12><c_4> at 2012-05-01 15:16. When 2012-05-01 17:35 user_2 is likely to visit:"
 
 if __name__ == "__main__":
-    config = LLMConfig()
-    model = load_inference_model(config)
-    prompt = "Hey how are you doing today?"
+    config = LLMConfig(run_name="llama3-nyc-unsloth")
+    model = load_fast_inference_model(config)
+    prompt = instruction_str + "\n" + input_str
     response = inference(config, model, prompt)
     print(response)

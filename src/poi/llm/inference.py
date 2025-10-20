@@ -1,6 +1,7 @@
 import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM
+from unsloth import FastLanguageModel
 
 from .config import LLMConfig
 
@@ -17,7 +18,7 @@ def load_pretrained_model(config: LLMConfig):
 
 def load_inference_model(config: LLMConfig):
     model = AutoModelForCausalLM.from_pretrained(
-        config.model_id,
+        config.model_dir.as_posix(),
         quantization_config=config.bnb_config,
         device_map="auto",
         trust_remote_code=True,
@@ -26,6 +27,16 @@ def load_inference_model(config: LLMConfig):
     model.eval()
     return model
 
+def load_fast_inference_model(config: LLMConfig):
+    model, _ = FastLanguageModel.from_pretrained(
+        model_name=config.model_dir.as_posix(),
+        max_seq_length=config.max_length,
+        dtype=None,
+        load_in_4bit=config.quantization_bits == 4,
+        load_in_8bit=config.quantization_bits == 8,
+    )
+    model = FastLanguageModel.for_inference(model)
+    return model
 
 @torch.inference_mode()
 def inference(config: LLMConfig, model: PeftModel, prompt: str):

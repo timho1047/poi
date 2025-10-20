@@ -31,3 +31,6 @@ build-backend = "uv_build"
 
 [tool.uv]
 no-build-isolation-package = ['flash-attn']
+
+[tool.ruff]
+line-length = 150

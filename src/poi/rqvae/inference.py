@@ -5,7 +5,11 @@ import torch
 from ..rqvae import RQVAE, RQVAEConfig
 
 
-def load_model(config: RQVAEConfig):
+def load_model(config: RQVAEConfig, from_checkpoint: bool = False):
+    """
+    Load the RQVAE model from the config.
+    If from_checkpoint is True, load the model from the checkpoint.
+    """
     model = RQVAE(
         embedding_dim=config.embedding_dim,
         vae_hidden_dims=config.vae_hidden_dims,
@@ -13,7 +17,13 @@ def load_model(config: RQVAEConfig):
         vector_num=config.vector_num,
         codebook_num=config.codebook_num,
         commitment_weight=config.commitment_weight,
+        random_state=config.random_state,
     ).to(config.device)
+
+    if from_checkpoint:
+        ckp = torch.load(config.checkpoint_best_path)
+        model.load_state_dict(ckp["model_state_dict"])
+
     return model
 
 @torch.inference_mode()
@@ -22,7 +32,7 @@ def encode_poi_sid(model: RQVAE, batch: torch.Tensor):
     batch_size = batch.size(0)
     all_indices: list[torch.Tensor]
 
-    _, _, all_indices = model.forward(batch.to(model.device))
+    _, _, all_indices = model.forward(batch)
 
     codebook_num = len(all_indices)
     assert codebook_num <= len(letters)

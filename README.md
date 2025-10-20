@@ -115,3 +115,30 @@ class RQVAEConfig:
 config = RQVAEConfig(run_name="rqvae-tky-lr-1e-5")
 train_rqvae(config)
 ```
+
+### API
+1. See `scripts/inference_rqvae.py` for the API of encoding POI sids.
+2. See `scripts/inference_llm.py` for the API of LLM inference.
+3. See `scripts/train_llm.py` for the API of training LLM.
+4. See `scripts/train_rqvae.py` for the API of training RQVAE.
+
+### Dataset format
+All datasets should be placed under `datasets` directory in the following format (tentative):
+```
+datasets/
+├── NYC/
+│   ├── train_codebook.json
+│   ├── test_codebook.json
+│   ├── poi_features.pt
+│   ├── metadata.json
+├── TKY/
+│   ├── train_codebook.json
+│   ├── test_codebook.json
+│   ├── poi_features.pt
+│   ├── metadata.json
+├── GWL/
+│   ├── train_codebook.json
+│   ├── test_codebook.json
+│   ├── poi_features.pt
+│   ├── metadata.json
+```

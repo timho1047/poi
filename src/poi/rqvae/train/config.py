@@ -14,7 +14,7 @@ class RQVAEConfig:
     epoch_num: int = 50
     lr: float = 1e-5
     run_name: str = "rqvae-1"
-    
+
     num_dataloader_workers: int = 4  # 数据加载并行进程数，可根据 CPU 核数调整（2~8）
     device: Literal["cpu", "cuda", "mps"] = settings.DEVICE
 
@@ -41,11 +41,13 @@ class RQVAEConfig:
     embedding_dim: int = field(init=False)
 
     def __post_init__(self):
-        self.dataset_path = settings.DATASET_DIR / self.dataset_name
+        self.dataset_path = settings.DATASETS_DIR / self.dataset_name
         self.metadata = json.loads((self.dataset_path / "metadata.json").read_text())
         self.embedding_dim = self.metadata["total_dim"]
         self.log_dir = settings.OUTPUT_DIR / "logs" / "rqvae" / self.run_name
-        self.checkpoint_dir = settings.OUTPUT_DIR / "checkpoints" / "rqvae" / self.run_name
+        self.checkpoint_dir = (
+            settings.OUTPUT_DIR / "checkpoints" / "rqvae" / self.run_name
+        )
         self.checkpoint_path = self.checkpoint_dir / "rqvae_checkpoint.pt"
         self.checkpoint_best_path = self.checkpoint_dir / "rqvae_best.pt"
         self.code_indices_log_path = self.checkpoint_dir / "code_indices_log.pt"
@@ -54,6 +56,6 @@ class RQVAEConfig:
         # - NYC: 3 layers × 32 codewords × 64 dims
         # - TKY/GWL: 3 layers × 64 codewords × 64 dims
         self.vector_num = 32 if self.dataset_name == "NYC" else 64
-        
+
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)

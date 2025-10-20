@@ -24,6 +24,7 @@ def train_llm(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset):
         quantization_config=config.bnb_config,
         device_map="auto",
         trust_remote_code=True,
+        attn_implementation="flash_attention_2",
     )
     model = prepare_model_for_kbit_training(model)
     model = get_peft_model(model, config.lora_config)

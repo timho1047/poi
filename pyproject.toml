@@ -19,6 +19,7 @@ dependencies = [
     "torch>=2.8.0",
     "transformers>=4.56.2",
     "trl>=0.15.2",
+    "unsloth>=2025.10.6",
 ]
 
 [project.scripts]
@@ -27,3 +28,6 @@ poi = "poi:main"
 [build-system]
 requires = ["uv_build>=0.8.22,<0.9.0"]
 build-backend = "uv_build"
+
+[tool.uv]
+no-build-isolation-package = ['flash-attn']

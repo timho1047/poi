@@ -15,3 +15,4 @@ model = load_inference_model(config, from_hub=False)
 # Encode POI sids
 sids = encode_poi_sid(model, batch)
 print(sids)
+

@@ -6,14 +6,12 @@ from tqdm import tqdm
 from ...dataset.rqvae import get_dataloader  # 导入自定义 DataLoader 工厂函数
 from ...rqvae.model import RQVAE
 from .config import RQVAEConfig
-from .hf import upload_to_hf
+from .hf import generate_model_card, upload_to_hf
 
 LOSS_TERMS = ["reconstruction", "quantization", "utilization", "compactness"]
 
+
 def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
-    
-
-
     writer = SummaryWriter(log_dir=config.log_dir)  # 初始化TensorBoard日志目录
 
     print(f"Using device: {config.device}")
@@ -143,6 +141,9 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
     torch.save(code_indices_log, config.code_indices_log_path)
     print(f"Training finished. Artifacts: {config.checkpoint_best_path}, {config.code_indices_log_path}")
     writer.close()  # 关闭TensorBoard日志
+
+    model_card = generate_model_card(config)
+    config.model_card_path.write_text(model_card)
 
     if push_to_hub:
         upload_to_hf(config)

@@ -32,6 +32,7 @@ class RQVAEConfig:
     # Inferred configs, no need to provide during initialization
     dataset_path: Path = field(init=False)
     hub_id: str = field(init=False)
+    model_card_path: Path = field(init=False)
     checkpoint_dir: Path = field(init=False)
     checkpoint_path: Path = field(init=False)
     checkpoint_best_path: Path = field(init=False)
@@ -54,6 +55,7 @@ class RQVAEConfig:
         self.checkpoint_best_path = self.checkpoint_dir / "rqvae_best.pt"
         self.code_indices_log_path = self.checkpoint_dir / "code_indices_log.pt"
         self.hub_id = f"{settings.HF_ORG}/{self.run_name}"
+        self.model_card_path = self.checkpoint_dir / "README.md"
 
         # According to the paper:
         # - NYC: 3 layers × 32 codewords × 64 dims

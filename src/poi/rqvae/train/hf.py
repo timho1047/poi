@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-import json
 
 from huggingface_hub import create_repo, upload_file
 
@@ -25,14 +24,14 @@ def generate_model_card(config: RQVAEConfig) -> str:
     lines.append(f"- VAE hidden dims: {config.vae_hidden_dims}")
     lines.append(f"- Codebooks: {config.codebook_num} × {config.vector_num} × {config.vector_dim}")
     lines.append(f"- Commitment weight: {config.commitment_weight}")
-    lines.append(f"- Loss weights: \n{json.dumps(config.loss_weights, indent=2)}\n")
+    lines.append(f"- Loss weights: {config.loss_weights}\n")
     lines.append("## Training\n")
     lines.append(f"- Batch size: {config.batch_size}")
     lines.append(f"- Epochs: {config.epoch_num}")
     lines.append(f"- LR: {config.lr}")
     
     content = "\n".join(lines) + "\n"
-    return content.encode("utf-8")
+    return content
 
 
 def upload_to_hf(
@@ -45,18 +44,8 @@ def upload_to_hf(
     except Exception as e:
         print(f"[HF] 创建/获取仓库失败: {e}")
         return
-    # 上传README (model card)
-    readme_content = generate_model_card(config)
-    upload_file(
-        path_or_fileobj=readme_content,
-        path_in_repo="README.md",
-        repo_id=config.hub_id,
-        token=settings.HF_TOKEN,
-    )
-    print("[HF] 上传 README.md 成功")
 
-    # 上传其它文件
-    for f in [config.checkpoint_best_path, config.code_indices_log_path, config.checkpoint_path]:
+    for f in [config.checkpoint_best_path, config.code_indices_log_path, config.checkpoint_path, config.model_card_path]:
         upload_file(
             path_or_fileobj=f,
             path_in_repo=f.name,

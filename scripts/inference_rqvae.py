@@ -10,7 +10,7 @@ train_loader = get_dataloader(config.dataset_path, batch_size=config.batch_size,
 batch = next(iter(train_loader)).to(DEVICE)
 
 # Set from_hub to True to load the model from the Hugging Face hub, or False to load the model from the local checkpoint
-model = load_inference_model(config, from_hub=True)  
+model = load_inference_model(config, from_hub=False)  
 
 # Encode POI sids
 sids = encode_poi_sid(model, batch)

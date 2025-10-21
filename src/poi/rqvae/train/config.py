@@ -22,7 +22,7 @@ class RQVAEConfig:
     codebook_num: int = 3
     vector_num: int = 64
     vector_dim: int = 64
-    vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 512, 1024])
+    vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 256, 512])
 
     quant_weight: float = 1.0
     div_weight: float = 0.25

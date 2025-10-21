@@ -5,19 +5,14 @@ from tqdm import tqdm
 
 from ...dataset.rqvae import get_dataloader  # 导入自定义 DataLoader 工厂函数
 from ...rqvae.model import RQVAE
-from ...settings import HF_PRIVATE, HF_REPO, HF_TOKEN
 from .config import RQVAEConfig
 from .hf import upload_to_hf
 
+LOSS_TERMS = ["reconstruction", "quantization", "utilization", "compactness"]
 
-def train_rqvae(config: RQVAEConfig):
-    LOSS_TERMS = ["reconstruction", "quantization", "utilization", "compactness"]
-    LOSS_WEIGHTS = {
-        "reconstruction": 1.0,
-        "quantization": config.quant_weight,
-        "utilization": config.div_weight,
-        "compactness": config.div_weight,
-    }
+def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
+    
+
 
     writer = SummaryWriter(log_dir=config.log_dir)  # 初始化TensorBoard日志目录
 
@@ -72,21 +67,17 @@ def train_rqvae(config: RQVAEConfig):
 
     # ==== 正常训练循环 ====
     with tqdm(total=config.epoch_num, desc="Training") as epoch_pbar:
-        epoch_pbar.update(start_epoch) # resume progress bar
+        epoch_pbar.update(start_epoch)  # resume progress bar
         for epoch in tqdm(range(start_epoch, config.epoch_num), desc="Training"):
             total_loss_dict = {k: 0.0 for k in LOSS_TERMS}
 
             batch_loss = 0.0
 
-            with tqdm(
-                total=len(train_loader), desc=f"Epoch {epoch}", leave=False
-            ) as pbar:
+            with tqdm(total=len(train_loader), desc=f"Epoch {epoch}", leave=False) as pbar:
                 for step, batch in enumerate(train_loader):
                     if epoch == 0 and step == 0:
                         # Initialize quantizer via k-means with the first batch only
-                        rqvae_model.initialize(
-                            batch.to(config.device, non_blocking=True)
-                        )
+                        rqvae_model.initialize(batch.to(config.device, non_blocking=True))
                         continue
 
                     x = batch.to(config.device, non_blocking=True)
@@ -96,34 +87,23 @@ def train_rqvae(config: RQVAEConfig):
                     # loss = sum([step_loss_dict[k]*LOSS_WEIGHTS[k] for k in LOSS_TERMS])
                     recon = step_loss_dict["reconstruction"]
                     quant = step_loss_dict["quantization"]
-                    div = step_loss_dict.get(
-                        "utilization", 0.0
-                    )  # or 'diversity' if in model
+                    div = step_loss_dict.get("utilization", 0.0)  # or 'diversity' if in model
                     loss = recon + 1.0 * quant + 0.25 * div
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(
-                        rqvae_model.parameters(), max_norm=1.0
-                    )
+                    torch.nn.utils.clip_grad_norm_(rqvae_model.parameters(), max_norm=1.0)
                     optimizer.step()
                     # 累加到 total_loss_dict
                     for k in LOSS_TERMS:
                         total_loss_dict[k] += float(step_loss_dict.get(k, torch.tensor(0.0)).detach())
                     if step % 50 == 0:  # 每50个 batch 打印一次
-                        batch_loss = sum(
-                            [step_loss_dict[k] * LOSS_WEIGHTS[k] for k in LOSS_TERMS]
-                        )
+                        batch_loss = sum([step_loss_dict[k] * config.loss_weights[k] for k in LOSS_TERMS])
                         pbar.update(50)
                         pbar.set_postfix({"batch_loss": f"{batch_loss:.4f}"})
 
                     # 只记录最后一批的 code indices 作为示例
                     if step == len(train_loader) - 1:
-                        code_indices_log.append(
-                            [
-                                inds.detach().cpu().numpy().tolist()
-                                for inds in all_indices
-                            ]
-                        )
-            total_loss = sum([total_loss_dict[k] * LOSS_WEIGHTS[k] for k in LOSS_TERMS])
+                        code_indices_log.append([inds.detach().cpu().numpy().tolist() for inds in all_indices])
+            total_loss = sum([total_loss_dict[k] * config.loss_weights[k] for k in LOSS_TERMS])
             epoch_pbar.update(1)
             epoch_pbar.set_postfix(
                 {
@@ -147,9 +127,7 @@ def train_rqvae(config: RQVAEConfig):
                     },
                     config.checkpoint_best_path,
                 )
-                epoch_pbar.write(
-                    f"Saved new best model at epoch {epoch} with loss {best_loss:.4f}"
-                )
+                epoch_pbar.write(f"Saved new best model at epoch {epoch} with loss {best_loss:.4f}")
             # 每个epoch都保存断点，便于中断后恢复
             torch.save(
                 {
@@ -161,30 +139,10 @@ def train_rqvae(config: RQVAEConfig):
                 },
                 config.checkpoint_path,
             )
-            epoch_pbar.write(f"Checkpoint saved at epoch {epoch} -> {config.checkpoint_path}")
     # 保存 codebook indices log
     torch.save(code_indices_log, config.code_indices_log_path)
-    print(
-        f"Training finished. Artifacts: {config.checkpoint_best_path}, {config.code_indices_log_path}"
-    )
+    print(f"Training finished. Artifacts: {config.checkpoint_best_path}, {config.code_indices_log_path}")
     writer.close()  # 关闭TensorBoard日志
 
-    # ===== 训练完成后可选：上传到 Hugging Face =====
-    if HF_REPO:
-        print(f"[HF] 检测到 HF_REPO={HF_REPO}，准备上传模型和日志...")
-        files_to_upload = [
-            config.checkpoint_best_path,
-            config.code_indices_log_path,
-            config.checkpoint_path,
-        ]
-        upload_to_hf(
-            HF_REPO,
-            files_to_upload,
-            metadata_dict=config.metadata,
-            private=HF_PRIVATE,
-            token=HF_TOKEN,
-        )
-    else:
-        print(
-            "[HF] 未设置 HF_REPO，跳过上传。若需上传，请设置环境变量 HF_REPO 与 HF_TOKEN。"
-        )
+    if push_to_hub:
+        upload_to_hf(config)

@@ -12,3 +12,4 @@ wheels/
 datasets/
 output/
 unsloth_compiled_cache
+.env

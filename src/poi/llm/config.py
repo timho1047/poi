@@ -34,10 +34,13 @@ class LLMConfig:
     lora_rank: int = 16
     lora_alpha: int = 32
     warmup_steps: int = 20
+    max_grad_norm: float = 0.3
+    optimizer: str = "paged_adamw_8bit" 
 
     # Inferred configs, no need to provide during initialization
+    hub_id: str = field(init=False)
+    model_card_path: Path = field(init=False)
     checkpoint_dir: Path = field(init=False)
-    model_dir: Path = field(init=False)
     log_dir: Path = field(init=False)
     bnb_config: BitsAndBytesConfig = field(init=False)
     lora_config: LoraConfig = field(init=False)
@@ -46,25 +49,17 @@ class LLMConfig:
 
     def __post_init__(self):
         self.checkpoint_dir = settings.CHECKPOINTS_DIR / "llm" / self.run_name
-        self.model_dir = self.checkpoint_dir / self.run_name
         self.log_dir = settings.LOGS_DIR / "llm" / self.run_name
+        self.hub_id = f"{settings.HF_ORG}/{self.run_name}"
+        self.model_card_path = self.checkpoint_dir / "README.md"
 
-        self.model_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        checkpoint_dirs = [
-            d
-            for d in self.checkpoint_dir.iterdir()
-            if d.is_dir() and d.name.startswith("checkpoint-")
-        ]
-        self.resume_from_checkpoint = (
-            len(checkpoint_dirs) > 0 and self.resume_from_checkpoint
-        )
+        checkpoint_dirs = [d for d in self.checkpoint_dir.iterdir() if d.is_dir() and d.name.startswith("checkpoint-")]
+        self.resume_from_checkpoint = len(checkpoint_dirs) > 0 and self.resume_from_checkpoint
         self.bf16 = self.device == "cuda" and torch.cuda.is_bf16_supported()
 
-        self.bnb_config = (
-            BNB_CONFIG_8BIT if self.quantization_bits == 8 else BNB_CONFIG_4BIT
-        )
+        self.bnb_config = BNB_CONFIG_8BIT if self.quantization_bits == 8 else BNB_CONFIG_4BIT
         self.lora_config = LORA_CONFIG
         self.lora_config.r = self.lora_rank
         self.lora_config.lora_alpha = self.lora_alpha
@@ -83,6 +78,10 @@ class LLMConfig:
             eval_on_start=False,
             save_strategy="epoch",
             max_length=self.max_length,
+            push_to_hub=False,
+            hub_model_id=self.hub_id,
+            hub_strategy="end",
+            hub_token=settings.HF_TOKEN,
             # Training parameters
             per_device_train_batch_size=self.batch_size,
             per_device_eval_batch_size=self.batch_size,
@@ -90,8 +89,8 @@ class LLMConfig:
             learning_rate=self.lr,
             lr_scheduler_type=self.lr_scheduler_type,
             warmup_steps=self.warmup_steps,
-            optim="paged_adamw_8bit",
-            max_grad_norm=0.3,
+            optim=self.optimizer,
+            max_grad_norm=self.max_grad_norm,
             seed=settings.RANDOM_STATE,
             data_seed=settings.RANDOM_STATE,
             bf16=self.bf16,
@@ -99,7 +98,6 @@ class LLMConfig:
             # Some speed optimization
             gradient_checkpointing=True,  # Should be default, but make it explicit
             gradient_checkpointing_kwargs={"use_reentrant": False},  # Faster variant
-            # packing=True,
         )
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
 

@@ -16,20 +16,20 @@ def load_pretrained_model(config: LLMConfig):
     return model
 
 
-def load_inference_model(config: LLMConfig):
+def load_inference_model(config: LLMConfig, from_hub: bool = False):
     model = AutoModelForCausalLM.from_pretrained(
-        config.model_dir.as_posix(),
+        config.model_id,
         quantization_config=config.bnb_config,
         device_map="auto",
         trust_remote_code=True,
     )
-    model = PeftModel.from_pretrained(model, config.model_dir)
+    model = PeftModel.from_pretrained(model, config.hub_id if from_hub else config.checkpoint_dir.as_posix())
     model.eval()
     return model
 
-def load_fast_inference_model(config: LLMConfig):
+def load_fast_inference_model(config: LLMConfig, from_hub: bool = False):
     model, _ = FastLanguageModel.from_pretrained(
-        model_name=config.model_dir.as_posix(),
+        model_name=config.hub_id if from_hub else config.checkpoint_dir.as_posix(),
         max_seq_length=config.max_length,
         dtype=None,
         load_in_4bit=config.quantization_bits == 4,

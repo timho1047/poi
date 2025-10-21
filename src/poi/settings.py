@@ -5,10 +5,7 @@ from typing import Literal
 import torch
 from dotenv import load_dotenv
 
-load_dotenv()
 
-
-# Initialize RQVAE model and optimizer
 # 选择计算设备：优先 CUDA，其次 MPS（苹果），否则 CPU
 def get_device():
     if torch.cuda.is_available():
@@ -19,6 +16,10 @@ def get_device():
 
 
 ROOT_DIR = Path(__file__).parent.parent.parent
+
+load_dotenv(ROOT_DIR / ".env")
+
+
 DATASETS_DIR = ROOT_DIR / "datasets"
 OUTPUT_DIR = ROOT_DIR / "output"
 CHECKPOINTS_DIR = OUTPUT_DIR / "checkpoints"
@@ -31,10 +32,10 @@ RANDOM_STATE = int(os.getenv("RANDOM_STATE", 43))
 # 通过环境变量进行配置：
 # - HF_REPO: 目标仓库，格式为 "<username>/<repo_name>"
 # - HF_TOKEN: 访问令牌（建议设置为只读或写入token）
-# - HF_PRIVATE: 是否私有仓库（"1"=私有，"0"=公开），默认私有
+HF_ORG = "comp5331poi"
 HF_REPO = os.getenv("HF_REPO")
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_PRIVATE = os.getenv("HF_PRIVATE", "1") in ("1", "true", "True")
+HF_PRIVATE = False
 
 
 # Initialize directories

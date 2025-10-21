@@ -31,6 +31,7 @@ class RQVAEConfig:
 
     # Inferred configs, no need to provide during initialization
     dataset_path: Path = field(init=False)
+    hub_id: str = field(init=False)
     checkpoint_dir: Path = field(init=False)
     checkpoint_path: Path = field(init=False)
     checkpoint_best_path: Path = field(init=False)
@@ -39,6 +40,7 @@ class RQVAEConfig:
     metadata: dict[str, Any] = field(init=False)
     vector_num: int = field(init=False)
     embedding_dim: int = field(init=False)
+    loss_weights: dict[str, float] = field(init=False)
 
     def __post_init__(self):
         self.dataset_path = settings.DATASETS_DIR / self.dataset_name
@@ -51,11 +53,18 @@ class RQVAEConfig:
         self.checkpoint_path = self.checkpoint_dir / "rqvae_checkpoint.pt"
         self.checkpoint_best_path = self.checkpoint_dir / "rqvae_best.pt"
         self.code_indices_log_path = self.checkpoint_dir / "code_indices_log.pt"
+        self.hub_id = f"{settings.HF_ORG}/{self.run_name}"
 
         # According to the paper:
         # - NYC: 3 layers × 32 codewords × 64 dims
         # - TKY/GWL: 3 layers × 64 codewords × 64 dims
         self.vector_num = 32 if self.dataset_name == "NYC" else 64
+        self.loss_weights = {
+            "reconstruction": 1.0,
+            "quantization": self.quant_weight,
+            "utilization": self.div_weight,
+            "compactness": self.div_weight,
+        }
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)

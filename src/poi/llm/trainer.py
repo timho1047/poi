@@ -1,5 +1,6 @@
 import warnings
 
+from huggingface_hub import upload_file
 from peft import get_peft_model, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForCausalLM,
@@ -11,14 +12,14 @@ from datasets import Dataset
 
 from .. import settings
 from ..llm import LLMConfig
-from .utils import print_trainable_parameters, print_training_configuration
+from .utils import generate_model_card, print_trainable_parameters, print_training_configuration
 
 # Suppress harmless warnings
 warnings.filterwarnings("ignore", message=".*use_reentrant parameter.*")
 warnings.filterwarnings("ignore", message=".*MatMul8bitLt.*")
 
 
-def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset):
+def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):
     print_training_configuration(config)
 
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -48,15 +49,26 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
     )
-    trainer.train()
-
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
 
-    model.save_pretrained(config.model_dir)
-    config.tokenizer.save_pretrained(config.model_dir)
+    model_card = generate_model_card(config)
+    
+    if push_to_hub:
+        trainer.push_to_hub(commit_message=f"Training completed for {config.run_name}")
+        upload_file(
+            path_or_fileobj=model_card.encode("utf-8"),
+            path_in_repo="README.md",
+            repo_id=config.hub_id,
+            token=settings.HF_TOKEN,
+        )
+    else:
+        trainer.save_model(config.checkpoint_dir)
+
+    config.model_card_path.write_text(model_card)
+    return trainer
 
 
-def train_llm(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset):
+def train_llm(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):
     print_training_configuration(config)
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -80,5 +92,18 @@ def train_llm(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset):
 
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
 
-    model.save_pretrained(config.model_dir)
-    config.tokenizer.save_pretrained(config.model_dir)
+    model_card = generate_model_card(config)
+
+    if push_to_hub:
+        trainer.push_to_hub(commit_message=f"Training completed for {config.run_name}")
+        upload_file(
+            path_or_fileobj=model_card.encode("utf-8"),
+            path_in_repo="README.md",
+            repo_id=config.hub_id,
+            token=settings.HF_TOKEN,
+        )
+    else:
+        trainer.save_model(config.checkpoint_dir)
+
+    config.model_card_path.write_text(model_card)
+    return trainer

@@ -39,9 +39,9 @@ def load_inference_model(config: RQVAEConfig, from_hub: bool = False):
 
     if from_hub:
         ckp_path = hf_hub_download(repo_id=config.hub_id, filename=config.checkpoint_best_path.name, token=settings.HF_TOKEN)
-        ckp = torch.load(ckp_path)
+        ckp = torch.load(ckp_path, map_location=config.device)
     else:
-        ckp = torch.load(config.checkpoint_best_path)
+        ckp = torch.load(config.checkpoint_best_path, map_location=config.device)
 
     model.load_state_dict(ckp["model_state_dict"])
     model.eval()

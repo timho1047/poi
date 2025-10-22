@@ -6,12 +6,10 @@ import torch
 from dotenv import load_dotenv
 
 
-# 选择计算设备：优先 CUDA，其次 MPS（苹果），否则 CPU
+# 选择计算设备：优先 CUDA，否则 CPU
 def get_device():
     if torch.cuda.is_available():
         return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
     return "cpu"
 
 

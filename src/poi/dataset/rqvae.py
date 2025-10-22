@@ -14,7 +14,7 @@ DataLoader 模块：为 RQ-VAE 训练构建 PyTorch Dataset 和 DataLoader
 """
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional, Tuple, Dict, List
 import os
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -32,13 +32,14 @@ class POIDataset(Dataset):
                       该目录下需包含 poi_features.pt
     """
     
-    def __init__(self, dataset_root: str):
+    def __init__(self, dataset_root: str, indices: Optional[torch.Tensor] = None):
         features_path = os.path.join(dataset_root, 'poi_features.pt')
         if not os.path.exists(features_path):
             raise FileNotFoundError(f"POI features file not found: {features_path}")
         
         # 一次性加载到内存（适用于数据量不超过内存容量的场景）
         self.features = torch.load(features_path)
+        self.indices = indices  # 一个 LongTensor，指向 features 的子集索引；None 表示使用全部
         print(f"[POIDataset] Loaded features from {features_path}, shape: {self.features.shape}")
         
         # 可选：在此处添加数据预处理，例如归一化、裁剪等
@@ -46,6 +47,8 @@ class POIDataset(Dataset):
     
     def __len__(self):
         """返回数据集中样本总数"""
+        if self.indices is not None:
+            return self.indices.shape[0]
         return self.features.shape[0]
     
     def __getitem__(self, idx):
@@ -58,7 +61,10 @@ class POIDataset(Dataset):
         Returns:
             x: shape [feature_dim] 的 Tensor，表示一个 POI 的特征向量
         """
-        return self.features[idx]
+        if self.indices is not None:
+            real_idx = int(self.indices[idx])
+            return self.features[real_idx]
+        return self.features[int(idx)]
 
 
 def get_dataloader(
@@ -113,3 +119,89 @@ def get_dataloader(
           f"num_workers={num_workers}, pin_memory={pin_memory}, drop_last={drop_last}")
     
     return loader
+
+
+def _ensure_splits(
+    dataset_path: Path | str,
+    ratios: Tuple[float, float, float] = (0.8, 0.1, 0.1),
+    seed: int = 43,
+) -> Dict[str, torch.Tensor]:
+    """
+    依据给定比例在首次运行时生成 train/val/test 索引，并保存在 <dataset_path>/splits.pt。
+    后续运行直接复用该文件，保证划分一致性。
+    """
+    dataset_path = Path(dataset_path)
+    split_file = dataset_path / "splits.pt"
+
+    if split_file.exists():
+        splits = torch.load(split_file)
+        # 兼容性检查
+        if all(k in splits for k in ("train", "val", "test")):
+            return {k: torch.as_tensor(v, dtype=torch.long) for k, v in splits.items()}
+
+    features: torch.Tensor = torch.load(dataset_path / "poi_features.pt")
+    n = features.shape[0]
+
+    r_train, r_val, r_test = ratios
+    assert abs((r_train + r_val + r_test) - 1.0) < 1e-6, "split ratios must sum to 1.0"
+
+    g = torch.Generator()
+    g.manual_seed(seed)
+    perm = torch.randperm(n, generator=g)
+
+    n_train = int(n * r_train)
+    n_val = int(n * r_val)
+    n_test = n - n_train - n_val
+
+    idx_train = perm[:n_train]
+    idx_val = perm[n_train:n_train + n_val]
+    idx_test = perm[n_train + n_val:]
+
+    splits = {"train": idx_train, "val": idx_val, "test": idx_test}
+    # 保存为 CPU 上的 list，便于跨设备加载
+    torch.save({k: v.cpu() for k, v in splits.items()}, split_file)
+    print(f"[Split] Created splits at {split_file} with sizes: ",
+          {k: int(v.numel()) for k, v in splits.items()})
+    return splits
+
+
+def get_dataloaders(
+    dataset_path: Path | str,
+    batch_size: int = 128,
+    num_workers: int = 4,
+    device: str = Literal["cpu", "cuda", "mps"],
+    drop_last: bool = False,
+    prefetch_factor: int = 2,
+    ratios: Tuple[float, float, float] = (0.8, 0.1, 0.1),
+    seed: int = 43,
+) -> Dict[str, DataLoader]:
+    """
+    返回 train/val/test 三个 DataLoader，按给定比例划分，且划分在磁盘持久化。
+    - train: shuffle=True
+    - val/test: shuffle=False
+    """
+    splits = _ensure_splits(dataset_path, ratios, seed)
+
+    pin_memory = (device == 'cuda')
+    persistent = (num_workers > 0)
+
+    def make_loader(split: str, shuffle_flag: bool) -> DataLoader:
+        ds = POIDataset(str(dataset_path), indices=splits[split])
+        return DataLoader(
+            ds,
+            batch_size=batch_size,
+            shuffle=shuffle_flag,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            drop_last=drop_last if split == 'train' else False,
+            prefetch_factor=prefetch_factor if num_workers > 0 else None,
+            persistent_workers=persistent,
+        )
+
+    loaders = {
+        'train': make_loader('train', True),
+        'val': make_loader('val', False),
+        'test': make_loader('test', False),
+    }
+    print("[DataLoaders] Created with sizes:", {k: len(v) for k, v in loaders.items()})
+    return loaders

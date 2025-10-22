@@ -3,7 +3,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter  # 用于TensorBoard日志记录
 from tqdm import tqdm
 
-from ...dataset.rqvae import get_dataloader  # 导入自定义 DataLoader 工厂函数
+from ...dataset.rqvae import get_dataloader, get_dataloaders  # 导入自定义 DataLoader 工厂函数
 from ...rqvae.model import RQVAE
 from .config import RQVAEConfig
 from .hf import generate_model_card, upload_to_hf
@@ -34,15 +34,29 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
 
     # ===== 创建 DataLoader =====
     # 使用自定义 DataLoader 模块加载数据，支持 shuffle、多进程、pin_memory 等
-    train_loader = get_dataloader(
-        dataset_path=config.dataset_path,
-        batch_size=config.batch_size,
-        shuffle=True,
-        num_workers=config.num_dataloader_workers,
-        device=config.device,
-        drop_last=False,
-    )
-    print(f"DataLoader ready: {len(train_loader)} batches per epoch\n")
+    if getattr(config, "use_splits", False):
+        loaders = get_dataloaders(
+            dataset_path=config.dataset_path,
+            batch_size=config.batch_size,
+            num_workers=config.num_dataloader_workers,
+            device=config.device,
+            ratios=getattr(config, "split_ratios", (0.8, 0.1, 0.1)),
+            seed=getattr(config, "split_seed", config.random_state),
+        )
+        train_loader = loaders["train"]
+        val_loader = loaders["val"]
+        print(f"DataLoaders ready: train={len(train_loader)}, val={len(val_loader)}, test={len(loaders['test'])}\n")
+    else:
+        train_loader = get_dataloader(
+            dataset_path=config.dataset_path,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=config.num_dataloader_workers,
+            device=config.device,
+            drop_last=False,
+        )
+        val_loader = None
+        print(f"DataLoader ready: {len(train_loader)} batches per epoch\n")
 
     ## Training
 
@@ -82,11 +96,12 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
                     optimizer.zero_grad()
                     quantized, step_loss_dict, all_indices = rqvae_model(x)
 
-                    # loss = sum([step_loss_dict[k]*LOSS_WEIGHTS[k] for k in LOSS_TERMS])
-                    recon = step_loss_dict["reconstruction"]
-                    quant = step_loss_dict["quantization"]
-                    div = step_loss_dict.get("utilization", 0.0)  # or 'diversity' if in model
-                    loss = recon + 1.0 * quant + 0.25 * div
+                    # Compute weighted loss according to config
+                    loss = sum(
+                        config.loss_weights[k]
+                        * step_loss_dict.get(k, torch.tensor(0.0, device=config.device))
+                        for k in LOSS_TERMS
+                    )
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(rqvae_model.parameters(), max_norm=1.0)
                     optimizer.step()
@@ -94,7 +109,10 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
                     for k in LOSS_TERMS:
                         total_loss_dict[k] += float(step_loss_dict.get(k, torch.tensor(0.0)).detach())
                     if step % 50 == 0:  # 每50个 batch 打印一次
-                        batch_loss = sum([step_loss_dict[k] * config.loss_weights[k] for k in LOSS_TERMS])
+                        batch_loss = sum(
+                            step_loss_dict.get(k, torch.tensor(0.0, device=config.device)) * config.loss_weights[k]
+                            for k in LOSS_TERMS
+                        )
                         pbar.update(50)
                         pbar.set_postfix({"batch_loss": f"{batch_loss:.4f}"})
 
@@ -102,6 +120,20 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
                     if step == len(train_loader) - 1:
                         code_indices_log.append([inds.detach().cpu().numpy().tolist() for inds in all_indices])
             total_loss = sum([total_loss_dict[k] * config.loss_weights[k] for k in LOSS_TERMS])
+
+            # Optional: validation
+            val_total_loss = None
+            if 'val_loader' in locals() and val_loader is not None:
+                rqvae_model.eval()
+                with torch.no_grad():
+                    val_sum = {k: 0.0 for k in LOSS_TERMS}
+                    for vbatch in val_loader:
+                        vx = vbatch.to(config.device, non_blocking=True)
+                        _, vloss_dict, _ = rqvae_model(vx)
+                        for k in LOSS_TERMS:
+                            val_sum[k] += float(vloss_dict.get(k, torch.tensor(0.0)).detach())
+                    val_total_loss = sum(val_sum[k] * config.loss_weights[k] for k in LOSS_TERMS)
+                rqvae_model.train()
             epoch_pbar.update(1)
             epoch_pbar.set_postfix(
                 {
@@ -113,19 +145,26 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
             writer.add_scalar("Loss/total", total_loss, epoch)
             for k in LOSS_TERMS:
                 writer.add_scalar(f"Loss/{k}", total_loss_dict[k], epoch)
+            if val_total_loss is not None:
+                writer.add_scalar("ValLoss/total", val_total_loss, epoch)
+                for k in LOSS_TERMS:
+                    writer.add_scalar(f"ValLoss/{k}", val_sum[k], epoch)
             # 保存最优模型
-            if total_loss < best_loss:
-                best_loss = total_loss
+            # Select metric to track best
+            metric_for_best = float(val_total_loss) if val_total_loss is not None else float(total_loss)
+            if metric_for_best < best_loss:
+                best_loss = metric_for_best
                 torch.save(
                     {
                         "model_state_dict": rqvae_model.state_dict(),
                         "optimizer_state_dict": optimizer.state_dict(),
                         "epoch": epoch,
-                        "loss": float(best_loss),
+                        "loss": float(metric_for_best),
                     },
                     config.checkpoint_best_path,
                 )
-                epoch_pbar.write(f"Saved new best model at epoch {epoch} with loss {best_loss:.4f}")
+                which = "val" if val_total_loss is not None else "train"
+                epoch_pbar.write(f"Saved new best model at epoch {epoch} with {which} loss {metric_for_best:.4f}")
             # 每个epoch都保存断点，便于中断后恢复
             torch.save(
                 {

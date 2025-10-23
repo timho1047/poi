@@ -29,6 +29,7 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
         load_in_4bit=config.quantization_bits == 4,
         load_in_8bit=config.quantization_bits == 8,
         attn_implementation="flash_attention_2",
+        device_map="balanced",
     )
 
     model = FastLanguageModel.get_peft_model(

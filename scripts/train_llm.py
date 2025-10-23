@@ -4,13 +4,13 @@ from poi.llm import LLMConfig
 from poi.llm.trainer import train_llm_fast
 
 if __name__ == "__main__":
-    config = LLMConfig(run_name="llama3-nyc-1", num_epochs=3)
+    config = LLMConfig(run_name="llama3-nyc-multi-gpu-2", num_epochs=3, batch_size=2, gradient_accumulation_steps=4)
 
     DATASET_DIR = settings.DATASETS_DIR / "NYC"
     max_examples = 5
 
-    train_dataset = load_llm_dataset(DATASET_DIR / "train_codebook.json", max_examples=max_examples)
-    eval_dataset = load_llm_dataset(DATASET_DIR / "test_codebook.json", max_examples=max_examples)
+    train_dataset = load_llm_dataset(DATASET_DIR / "LLM Dataset" / "train_codebook.json", max_examples=max_examples)
+    eval_dataset = load_llm_dataset(DATASET_DIR / "LLM Dataset" / "test_codebook.json", max_examples=max_examples)
 
     print(f"Train dataset size: {len(train_dataset)} examples")
     print(f"Eval dataset size: {len(eval_dataset)} examples")

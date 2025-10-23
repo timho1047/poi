@@ -53,6 +53,7 @@ class LLMConfig:
         self.hub_id = f"{settings.HF_ORG}/{self.run_name}"
         self.model_card_path = self.checkpoint_dir / "README.md"
 
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         checkpoint_dirs = [d for d in self.checkpoint_dir.iterdir() if d.is_dir() and d.name.startswith("checkpoint-")]
@@ -98,6 +99,7 @@ class LLMConfig:
             # Some speed optimization
             gradient_checkpointing=True,  # Should be default, but make it explicit
             gradient_checkpointing_kwargs={"use_reentrant": False},  # Faster variant
+            ddp_find_unused_parameters=False, # Multi-GPU training for unsloth
         )
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
 

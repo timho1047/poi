@@ -9,7 +9,7 @@ from ... import settings
 @dataclass
 class RQVAEConfig:
     # Training parameters
-    dataset_name: Literal["NYC", "TKY", "GWL"] = "GWL"
+    dataset_name: Literal["NYC", "TKY"] = "TKY"
     batch_size: int = 128
     epoch_num: int = 50
     lr: float = 1e-5
@@ -22,7 +22,7 @@ class RQVAEConfig:
     codebook_num: int = 3
     vector_num: int = 64
     vector_dim: int = 64
-    vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 256, 512])
+    vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 512, 1024])
 
     quant_weight: float = 1.0
     div_weight: float = 0.25
@@ -44,7 +44,7 @@ class RQVAEConfig:
     loss_weights: dict[str, float] = field(init=False)
 
     def __post_init__(self):
-        self.dataset_path = settings.DATASETS_DIR / self.dataset_name
+        self.dataset_path = settings.DATASETS_DIR / self.dataset_name / "RQVAE Dataset"
         self.metadata = json.loads((self.dataset_path / "metadata.json").read_text())
         self.embedding_dim = self.metadata["total_dim"]
         self.log_dir = settings.OUTPUT_DIR / "logs" / "rqvae" / self.run_name

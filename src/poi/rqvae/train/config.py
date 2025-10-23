@@ -12,7 +12,7 @@ class RQVAEConfig:
     dataset_name: Literal["NYC", "TKY"] = "TKY"
     batch_size: int = 128
     epoch_num: int = 50
-    lr: float = 1e-5
+    lr: float = 1e-4
     run_name: str = "rqvae-1"
 
     num_dataloader_workers: int = 4  # 数据加载并行进程数，可根据 CPU 核数调整（2~8）

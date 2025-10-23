@@ -27,6 +27,7 @@ class RQVAEConfig:
     quant_weight: float = 1.0
     div_weight: float = 0.25
     commitment_weight: float = 0.5
+    recon_weight: float = 1.0
     random_state: int = settings.RANDOM_STATE
 
     # Inferred configs, no need to provide during initialization
@@ -62,7 +63,7 @@ class RQVAEConfig:
         # - TKY/GWL: 3 layers × 64 codewords × 64 dims
         self.vector_num = 32 if self.dataset_name == "NYC" else 64
         self.loss_weights = {
-            "reconstruction": 1.0,
+            "reconstruction": self.recon_weight,
             "quantization": self.quant_weight,
             "utilization": self.div_weight,
             "compactness": self.div_weight,

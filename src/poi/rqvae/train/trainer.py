@@ -82,11 +82,12 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
                     optimizer.zero_grad()
                     quantized, step_loss_dict, all_indices = rqvae_model(x)
 
-                    # loss = sum([step_loss_dict[k]*LOSS_WEIGHTS[k] for k in LOSS_TERMS])
-                    recon = step_loss_dict["reconstruction"]
-                    quant = step_loss_dict["quantization"]
-                    div = step_loss_dict.get("utilization", 0.0)  # or 'diversity' if in model
-                    loss = recon + 1.0 * quant + 0.25 * div
+                    # Compute weighted loss according to config (include all LOSS_TERMS)
+                    loss = sum(
+                        config.loss_weights[k]
+                        * step_loss_dict.get(k, torch.tensor(0.0, device=config.device))
+                        for k in LOSS_TERMS
+                    )
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(rqvae_model.parameters(), max_norm=1.0)
                     optimizer.step()
@@ -94,7 +95,10 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
                     for k in LOSS_TERMS:
                         total_loss_dict[k] += float(step_loss_dict.get(k, torch.tensor(0.0)).detach())
                     if step % 50 == 0:  # 每50个 batch 打印一次
-                        batch_loss = sum([step_loss_dict[k] * config.loss_weights[k] for k in LOSS_TERMS])
+                        batch_loss = sum(
+                            step_loss_dict.get(k, torch.tensor(0.0, device=config.device)) * config.loss_weights[k]
+                            for k in LOSS_TERMS
+                        )
                         pbar.update(50)
                         pbar.set_postfix({"batch_loss": f"{batch_loss:.4f}"})
 

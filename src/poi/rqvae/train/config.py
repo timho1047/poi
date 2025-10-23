@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from ... import settings
 
@@ -20,7 +20,8 @@ class RQVAEConfig:
 
     # Model parameters
     codebook_num: int = 3
-    vector_num: int = 64
+    # If None, will be inferred by dataset (NYC->32, others->64)
+    vector_num: Optional[int] = None
     vector_dim: int = 64
     vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 512, 1024])
 
@@ -39,7 +40,6 @@ class RQVAEConfig:
     code_indices_log_path: Path = field(init=False)
     log_dir: Path = field(init=False)
     metadata: dict[str, Any] = field(init=False)
-    vector_num: int = field(init=False)
     embedding_dim: int = field(init=False)
     loss_weights: dict[str, float] = field(init=False)
 
@@ -60,7 +60,8 @@ class RQVAEConfig:
         # According to the paper:
         # - NYC: 3 layers × 32 codewords × 64 dims
         # - TKY/GWL: 3 layers × 64 codewords × 64 dims
-        self.vector_num = 32 if self.dataset_name == "NYC" else 64
+        if self.vector_num is None:
+            self.vector_num = 32 if self.dataset_name == "NYC" else 64
         self.loss_weights = {
             "reconstruction": 1.0,
             "quantization": self.quant_weight,

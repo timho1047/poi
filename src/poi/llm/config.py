@@ -99,7 +99,6 @@ class LLMConfig:
             # Some speed optimization
             gradient_checkpointing=True,  # Should be default, but make it explicit
             gradient_checkpointing_kwargs={"use_reentrant": False},  # Faster variant
-            ddp_find_unused_parameters=False, # Multi-GPU training for unsloth
         )
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
 

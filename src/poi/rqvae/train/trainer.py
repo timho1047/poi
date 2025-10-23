@@ -143,7 +143,7 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
     writer.close()  # 关闭TensorBoard日志
 
     model_card = generate_model_card(config)
-    config.model_card_path.write_text(model_card)
+    config.model_card_path.write_bytes(model_card)
 
     if push_to_hub:
         upload_to_hf(config)

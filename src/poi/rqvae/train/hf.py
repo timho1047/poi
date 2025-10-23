@@ -6,7 +6,7 @@ from ... import settings
 from .config import RQVAEConfig
 
 
-def generate_model_card(config: RQVAEConfig) -> str:
+def generate_model_card(config: RQVAEConfig) -> bytes:
     """生成简易的模型卡片README内容，包含数据集和模型超参信息。"""
     lines = []
     lines.append("---\ntags:\n- poi\n- rqvae\n---\n")
@@ -22,7 +22,7 @@ def generate_model_card(config: RQVAEConfig) -> str:
             lines.append(f"- Feature dims: {fd}")
     lines.append("\n## Model\n")
     lines.append(f"- VAE hidden dims: {config.vae_hidden_dims}")
-    lines.append(f"- Codebooks: {config.codebook_num} × {config.vector_num} × {config.vector_dim}")
+    lines.append(f"- Codebooks: {config.codebook_num} x {config.vector_num} x {config.vector_dim}")
     lines.append(f"- Commitment weight: {config.commitment_weight}")
     lines.append(f"- Loss weights: {config.loss_weights}\n")
     lines.append("## Training\n")
@@ -31,7 +31,7 @@ def generate_model_card(config: RQVAEConfig) -> str:
     lines.append(f"- LR: {config.lr}")
     
     content = "\n".join(lines) + "\n"
-    return content
+    return content.encode("utf-8")
 
 
 def upload_to_hf(

@@ -33,8 +33,7 @@ RANDOM_STATE = int(os.getenv("RANDOM_STATE", 43))
 HF_ORG = "comp5331poi"
 HF_REPO = os.getenv("HF_REPO")
 HF_TOKEN = os.getenv("HF_TOKEN")
-# HF_REPO = "comp5331poi/rqvae-4"
-# HF_TOKEN = "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"
+
 HF_PRIVATE = False
 
 

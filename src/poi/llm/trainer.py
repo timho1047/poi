@@ -87,7 +87,7 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
         config.model_card_path.write_text(model_card)
         print("Model saved successfully.")
 
-    return trainer
+    return trainer, model, tokenizer
 
 
 @contextmanager
@@ -119,9 +119,9 @@ def train_llm_fast_ddp(config: LLMConfig, train_dataset: Dataset, eval_dataset: 
 
     # Wrap the training in a DDP context, will fallback to single GPU training if not using DDP
     with ddp_context() as (_, rank, _):
-        trainer = train_llm_fast(config, train_dataset, eval_dataset, push_to_hub, rank)
+        trainer, model, tokenizer = train_llm_fast(config, train_dataset, eval_dataset, push_to_hub, rank)
 
-    return trainer
+    return trainer, model, tokenizer
 
 
 class TrainLLMRun(TypedDict):
@@ -134,7 +134,7 @@ class TrainLLMRun(TypedDict):
 
 
 def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
-    with ddp_context() as (_, rank, _):
+    with ddp_context() as (_, rank, world_size):
         if rank == 0:
             global_start_time = time.time()
             if any(run["push_to_hub"] for run in runs):
@@ -162,7 +162,7 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
                         print(f"Repo {run['config'].hub_id} already exists, skipping...")
                         print(f"{'=' * 70}\n")
                 else:
-                    trainer = train_llm_fast(run["config"], train_dataset, eval_dataset, run["push_to_hub"], rank=rank)
+                    trainer, model, tokenizer = train_llm_fast(run["config"], train_dataset, eval_dataset, run["push_to_hub"], rank=rank)
 
             except Exception as e:
                 if rank == 0:
@@ -172,12 +172,39 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
                     print(f"Error: {str(e)}")
 
             finally:
+                # 1. Delete optimizer state from trainer
+                if trainer is not None:
+                    if hasattr(trainer, "optimizer") and trainer.optimizer is not None:
+                        del trainer.optimizer
+                    if hasattr(trainer, "lr_scheduler") and trainer.lr_scheduler is not None:
+                        del trainer.lr_scheduler
+                    # Remove model reference from trainer
+                    if hasattr(trainer, "model"):
+                        trainer.model = None
+                    del trainer
+
+                # 2. Delete model (largest memory consumer)
+                if model is not None:
+                    # Move model to CPU first to free GPU memory
+                    if hasattr(model, "cpu"):
+                        model.cpu()
+                    del model
+
+                # 3. Delete tokenizer
+                if tokenizer is not None:
+                    del tokenizer
+                    
+                # 4. Delete datasets
                 if eval_dataset is not None:
                     del eval_dataset
                 if train_dataset is not None:
                     del train_dataset
-                if trainer is not None:
-                    del trainer
+
+                # 5. Synchronize before cleanup to ensure all ranks are done
+                if world_size > 1 and torch.distributed.is_initialized():
+                    torch.distributed.barrier()
+
+                # 6. Clean up memory
                 cleanup_memory()
 
                 if rank == 0:

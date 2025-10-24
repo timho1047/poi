@@ -49,25 +49,35 @@ def cleanup_memory(verbose: bool = True):
 
     # Force garbage collection
     gc.collect()
+    gc.collect()  # Run twice for better cleanup
+    gc.collect()
 
     # Clear CUDA cache if available
     if torch.cuda.is_available():
+        # Synchronize first
+        torch.cuda.synchronize()
+
+        # Empty cache
         torch.cuda.empty_cache()
+
+        # Reset memory stats
+        torch.cuda.reset_peak_memory_stats(local_rank)
+        torch.cuda.reset_accumulated_memory_stats(local_rank)
+
+        # IPC collect - helps with shared memory cleanup
+        torch.cuda.ipc_collect()
+
+        # Synchronize again
         torch.cuda.synchronize()
 
         # Print memory stats on rank 0
         if verbose and rank == 0:
             allocated = torch.cuda.memory_allocated(local_rank) / 1024**3
             reserved = torch.cuda.memory_reserved(local_rank) / 1024**3
-            max_allocated = torch.cuda.max_memory_allocated(local_rank) / 1024**3
-            max_reserved = torch.cuda.max_memory_reserved(local_rank) / 1024**3
 
-            print(f"\nGPU {local_rank} Memory Stats:")
-            print(f"  Current - Allocated: {allocated:.2f} GB, Reserved: {reserved:.2f} GB")
-            print(f"  Peak    - Allocated: {max_allocated:.2f} GB, Reserved: {max_reserved:.2f} GB")
-
-            # Reset peak memory stats for next model
-            torch.cuda.reset_peak_memory_stats(local_rank)
+            print(f"\nGPU {local_rank} Memory Stats After Cleanup:")
+            print(f"  Allocated: {allocated:.2f} GB")
+            print(f"  Reserved: {reserved:.2f} GB")
 
     if verbose and rank == 0:
         print("Memory cleanup complete.")

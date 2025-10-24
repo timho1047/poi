@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "sys_platform == 'linux'",
@@ -90,6 +90,19 @@ wheels = [
 ]
 
 [[package]]
+name = "anyio"
+version = "4.11.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "idna" },
+    { name = "sniffio" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
+]
+
+[[package]]
 name = "appnope"
 version = "0.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -121,13 +134,14 @@ name = "bitsandbytes"
 version = "0.48.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-    { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "torch" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/a1/c66a0d02091a9ef6704a153e09f541e70fc48db02df94fbbf1632b321aca/bitsandbytes-0.48.1-py3-none-manylinux_2_24_aarch64.whl", hash = "sha256:b7f440aee5ec8cb1d028b0d3b2d71e97c302766dc605232293f4a0f7e48b5c75", size = 34033906, upload-time = "2025-10-02T17:40:25.159Z" },
     { url = "https://files.pythonhosted.org/packages/a1/63/00b3f2af0b88edf5855792681641a71cf0605d6d88c62e98d75cff86d105/bitsandbytes-0.48.1-py3-none-manylinux_2_24_x86_64.whl", hash = "sha256:3e72cf07ba6d2169e69a61282a6f072fc675efee86049e56a33de099a0363ef2", size = 60088899, upload-time = "2025-10-02T17:40:28.732Z" },
+    { url = "https://files.pythonhosted.org/packages/05/46/339ab9a33fa0964b07a7a0e8b13ec02687f03c8e9b03164edfb8688ce08f/bitsandbytes-0.48.1-py3-none-win_amd64.whl", hash = "sha256:d7d3f9b00b132bb25f09320ee07ccbfae8c1e0ea11cae48fbf7e1eff9943c7b4", size = 59524237, upload-time = "2025-10-02T17:40:32.437Z" },
 ]
 
 [[package]]
@@ -248,12 +262,13 @@ wheels = [
 
 [[package]]
 name = "datasets"
-version = "4.1.1"
+version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dill" },
     { name = "filelock" },
     { name = "fsspec", extra = ["http"] },
+    { name = "httpx" },
     { name = "huggingface-hub" },
     { name = "multiprocess" },
     { name = "numpy" },
@@ -265,9 +280,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/a4/73f8e6ef52c535e1d20d5b2ca83bfe6de399d8b8b8a61ccc8d63d60735aa/datasets-4.1.1.tar.gz", hash = "sha256:7d8d5ba8b12861d2c44bfff9c83484ebfafff1ff553371e5901a8d3aab5450e2", size = 579324, upload-time = "2025-09-18T13:14:27.108Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/47/325206ac160f7699ed9f1798afa8f8f8d5189b03bf3815654859ac1d5cba/datasets-4.3.0.tar.gz", hash = "sha256:bc9118ed9afd92346c5be7ed3aaa00177eb907c25467f9d072a0d22777efbd2b", size = 582801, upload-time = "2025-10-23T16:31:51.547Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/c8/09012ac195a0aab58755800d2efdc0e7d5905053509f12cb5d136c911cda/datasets-4.1.1-py3-none-any.whl", hash = "sha256:62e4f6899a36be9ec74a7e759a6951253cc85b3fcfa0a759b0efa8353b149dac", size = 503623, upload-time = "2025-09-18T13:14:25.111Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/51/409a8184ed35453d9cbb3d6b20d524b1115c2c2d117b85d5e9b06cd70b45/datasets-4.3.0-py3-none-any.whl", hash = "sha256:0ea157e72138b3ca6c7d2415f19a164ecf7d4c4fa72da2a570da286882e96903", size = 506846, upload-time = "2025-10-23T16:31:49.965Z" },
 ]
 
 [[package]]
@@ -451,6 +466,15 @@ wheels = [
 ]
 
 [[package]]
+name = "h11"
+version = "0.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
 name = "hf-transfer"
 version = "0.1.9"
 source = { registry = "https://pypi.org/simple" }
@@ -489,6 +513,34 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4a/25/3e32ab61cc7145b11eee9d745988e2f0f4fafda81b25980eebf97d8cff15/hf_xet-1.1.10-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:0a0005fd08f002180f7a12d4e13b22be277725bc23ed0529f8add5c7a6309c06", size = 3248612, upload-time = "2025-09-12T20:10:24.093Z" },
     { url = "https://files.pythonhosted.org/packages/2c/3d/ab7109e607ed321afaa690f557a9ada6d6d164ec852fd6bf9979665dc3d6/hf_xet-1.1.10-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:f900481cf6e362a6c549c61ff77468bd59d6dd082f3170a36acfef2eb6a6793f", size = 3353360, upload-time = "2025-09-12T20:10:25.563Z" },
     { url = "https://files.pythonhosted.org/packages/ee/0e/471f0a21db36e71a2f1752767ad77e92d8cde24e974e03d662931b1305ec/hf_xet-1.1.10-cp37-abi3-win_amd64.whl", hash = "sha256:5f54b19cc347c13235ae7ee98b330c26dd65ef1df47e5316ffb1e87713ca7045", size = 2804691, upload-time = "2025-09-12T20:10:28.433Z" },
+]
+
+[[package]]
+name = "httpcore"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55", size = 78784, upload-time = "2025-04-24T22:06:20.566Z" },
+]
+
+[[package]]
+name = "httpx"
+version = "0.28.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad", size = 73517, upload-time = "2024-12-06T15:37:21.509Z" },
 ]
 
 [[package]]
@@ -1219,8 +1271,7 @@ name = "poi"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "accelerate" },
-    { name = "bitsandbytes", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "bitsandbytes" },
     { name = "datasets" },
     { name = "dotenv" },
     { name = "huggingface-hub", extra = ["cli"] },
@@ -1238,10 +1289,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "accelerate", specifier = ">=1.10.1" },
-    { name = "bitsandbytes", marker = "sys_platform == 'linux'", specifier = ">=0.48.1" },
-    { name = "bitsandbytes", marker = "sys_platform == 'windows'", specifier = ">=0.48.1" },
-    { name = "datasets", specifier = ">=3.3.0" },
+    { name = "bitsandbytes", specifier = ">=0.48.1" },
+    { name = "datasets", specifier = ">=4.3.0" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "huggingface-hub", extras = ["cli"], specifier = ">=0.35.3" },
     { name = "ipykernel", specifier = ">=6.30.1" },
@@ -1252,9 +1301,9 @@ requires-dist = [
     { name = "tensorboard", specifier = ">=2.20.0" },
     { name = "torch", specifier = ">=2.8.0" },
     { name = "transformers", specifier = ">=4.56.2" },
-    { name = "trl", specifier = ">=0.15.2" },
-    { name = "unsloth", marker = "sys_platform == 'linux'", specifier = ">=2025.10.8" },
-    { name = "unsloth", marker = "sys_platform == 'windows'", specifier = ">=2025.10.8" },
+    { name = "trl", specifier = ">=0.23.0" },
+    { name = "unsloth", marker = "sys_platform == 'linux'", specifier = ">=2025.10.9" },
+    { name = "unsloth", marker = "sys_platform == 'windows'", specifier = ">=2025.10.9" },
 ]
 
 [[package]]
@@ -1759,6 +1808,15 @@ wheels = [
 ]
 
 [[package]]
+name = "sniffio"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+]
+
+[[package]]
 name = "stack-data"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2047,7 +2105,7 @@ wheels = [
 
 [[package]]
 name = "unsloth"
-version = "2025.10.8"
+version = "2025.10.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accelerate", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
@@ -2073,14 +2131,14 @@ dependencies = [
     { name = "wheel", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "xformers", marker = "(platform_machine == 'AMD64' and sys_platform == 'linux' and 'linux' in sys_platform) or (platform_machine == 'x86_64' and sys_platform == 'linux' and 'linux' in sys_platform) or (platform_machine == 'AMD64' and sys_platform == 'windows' and 'linux' in sys_platform) or (platform_machine == 'x86_64' and sys_platform == 'windows' and 'linux' in sys_platform)" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/c6/cdeec138f6640bca687337291c90636ef7a43cf1a7147438f22d082a27fe/unsloth-2025.10.8.tar.gz", hash = "sha256:a35abeaf780c0bcfab7ee3f07a1fe3771f98b1a732ca937b71f3dffc7c929285", size = 4742041, upload-time = "2025-10-22T14:59:35.934Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/2d/900faffa520931d74b02cb34e91295da784877db8f6d293b2bcc540123f6/unsloth-2025.10.9.tar.gz", hash = "sha256:280b2a90803d7ea11f7560240b283bd4c20ee02efa12209f027fb464bfcf0432", size = 4741470, upload-time = "2025-10-23T12:55:14.332Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/e2/65bebfc7e5881fd2531d3613b6a3585cb1262cad9bcd0d084597bc9b4159/unsloth-2025.10.8-py3-none-any.whl", hash = "sha256:0f86570c024d865493f05b4754fb2188c32da2132619c66f8b85b5c4e7a17428", size = 347307, upload-time = "2025-10-22T14:59:29.061Z" },
+    { url = "https://files.pythonhosted.org/packages/35/a2/5933c80e8a35d3eeb7cb2cbd3abbd61a4ffbbd698960b4ec0be383d27d92/unsloth-2025.10.9-py3-none-any.whl", hash = "sha256:e3bf3a92a30db30784e1940302cb2df9808a170d859defc1c0f8ebd8bb96d1b4", size = 346731, upload-time = "2025-10-23T12:55:07.231Z" },
 ]
 
 [[package]]
 name = "unsloth-zoo"
-version = "2025.10.9"
+version = "2025.10.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accelerate", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
@@ -2108,9 +2166,9 @@ dependencies = [
     { name = "tyro", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "wheel", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/e9/c5e1ffd3a8cb5516387c72f86a5aa5b4f0536b6f9e45a899ce83406a3fcf/unsloth_zoo-2025.10.9.tar.gz", hash = "sha256:dbfb3094068a6dd488a8c786a0c681a5b6a26167e49ca990c1a04aebe1304cb2", size = 250615, upload-time = "2025-10-22T14:57:17.069Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/9b/5835a85cd32b74cf90ded5740c90f4c67ae279f50143d12a28c028900890/unsloth_zoo-2025.10.10.tar.gz", hash = "sha256:6d02f27bdb08b8d8ae4763429099b4a14f05f940fae62854c09eea1badd67540", size = 251591, upload-time = "2025-10-23T12:50:24.539Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/75/bd/984a148b147881d7833ae67bd1dc05b730b904833d5446f4b25d74bd64b5/unsloth_zoo-2025.10.9-py3-none-any.whl", hash = "sha256:06c1642af57cca5ec9b022d58972be1b41fc644f88efbd70b06c11471e75c54f", size = 269385, upload-time = "2025-10-22T14:57:15.389Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/5d/16ff1dafa2eedab3b95ecdc4673537b512b37e0d4bd37882180683f7b998/unsloth_zoo-2025.10.10-py3-none-any.whl", hash = "sha256:cd31d8da88053c01b51c95022a58b3ea931e08b1b62b20e2ca8d6b61e60eb3d5", size = 270444, upload-time = "2025-10-23T12:50:22.84Z" },
 ]
 
 [[package]]

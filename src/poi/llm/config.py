@@ -75,7 +75,7 @@ class LLMConfig:
             run_name=self.run_name,
             eval_strategy="epoch",
             save_total_limit=1,
-            load_best_model_at_end=True,
+            # load_best_model_at_end=True,
             eval_on_start=False,
             save_strategy="epoch",
             max_length=self.max_length,

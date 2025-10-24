@@ -24,8 +24,9 @@ def print_training_configuration(config: LLMConfig):
     print(f"  Quantization bits: {config.quantization_bits}")
     print(f"  Lora rank: {config.lora_rank}")
     print(f"  Lora alpha: {config.lora_alpha}")
+    print(f"  Lora dropout: {config.lora_config.lora_dropout}")
     print(f"  Warmup steps: {config.warmup_steps}")
-    print(f"  Checkpoint directory: {config.checkpoint_dir}")
+    print(f"  Checkpoint directory: {config.output_dir}")
     print(f"  Log directory: {config.log_dir}")
 
 

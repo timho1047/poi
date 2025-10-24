@@ -27,22 +27,27 @@ def train_llm_fast_multi_gpu(config: LLMConfig, train_dataset: Dataset, eval_dat
     LOCAL_RANK = int(os.environ.get("LOCAL_RANK", 0))
     RANK = int(os.environ.get("RANK", 0))
     WORLD_SIZE = int(os.environ.get("WORLD_SIZE", 1))
-
-    # Set device for this process (but don't manually init process group)
-    if torch.cuda.is_available():
+    IS_DIST = WORLD_SIZE > 1
+    
+    if IS_DIST:
+        if not torch.distributed.is_initialized():
+            torch.distributed.init_process_group(backend="nccl", init_method="env://")
         torch.cuda.set_device(LOCAL_RANK)
     device = torch.device(f"cuda:{LOCAL_RANK}" if torch.cuda.is_available() else "cpu")
 
     print(f"RANK={RANK} LOCAL_RANK={LOCAL_RANK} WORLD_SIZE={WORLD_SIZE} device={device}")
-    print_training_configuration(config)
+    
+    if RANK == 0:
+        print_training_configuration(config)
 
     # Load model on the specific device for this rank
-    device_map = {"": LOCAL_RANK} if torch.cuda.is_available() else None
+    device_map = {"": f"cuda:{LOCAL_RANK}"} if torch.cuda.is_available() else None
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=config.model_id,
         max_seq_length=config.max_length,
         load_in_4bit=config.quantization_bits == 4,
         load_in_8bit=config.quantization_bits == 8,
+        full_finetuning=False,
         attn_implementation="flash_attention_2",
         device_map=device_map,
     )
@@ -58,8 +63,9 @@ def train_llm_fast_multi_gpu(config: LLMConfig, train_dataset: Dataset, eval_dat
         random_state=settings.RANDOM_STATE,
     )
 
-    # Configure training args for multi-GPU
+    # Configure training args
     config.training_args.ddp_find_unused_parameters = False
+    config.training_args.dataset_text_field = "text"
 
     trainer = SFTTrainer(
         model=model,
@@ -72,17 +78,7 @@ def train_llm_fast_multi_gpu(config: LLMConfig, train_dataset: Dataset, eval_dat
     if RANK == 0:
         print("Start training on main process...")
 
-    # Synchronize before training starts
-    if WORLD_SIZE > 1 and torch.distributed.is_initialized():
-        torch.distributed.barrier()
-
-    # Trainer handles all DDP synchronization internally
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
-    print(f"RANK={RANK} is done training")
-
-    # Synchronize all processes after training
-    if WORLD_SIZE > 1 and torch.distributed.is_initialized():
-        torch.distributed.barrier()
 
     # Only rank 0 saves the model
     if RANK == 0:
@@ -103,9 +99,10 @@ def train_llm_fast_multi_gpu(config: LLMConfig, train_dataset: Dataset, eval_dat
         config.model_card_path.write_text(model_card)
         print("Model saved successfully.")
 
-    # Wait for rank 0 to finish saving
-    if WORLD_SIZE > 1 and torch.distributed.is_initialized():
+    # Graceful DDP cleanup
+    if IS_DIST and torch.distributed.is_initialized():
         torch.distributed.barrier()
+        torch.distributed.destroy_process_group()
 
     return trainer
 

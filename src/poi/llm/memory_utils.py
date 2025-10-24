@@ -9,6 +9,7 @@ import gc
 import os
 
 import torch
+from trl import SFTTrainer
 
 
 def get_rank_info():
@@ -140,7 +141,7 @@ def print_memory_summary(device: int = 0):
     print()
 
 
-def cleanup_trainer(trainer):
+def cleanup_trainer(trainer: SFTTrainer):
     """
     Clean up a trainer object and associated resources.
 
@@ -151,8 +152,6 @@ def cleanup_trainer(trainer):
         # Explicitly delete model and tokenizer from trainer
         if hasattr(trainer, "model"):
             del trainer.model
-        if hasattr(trainer, "tokenizer"):
-            del trainer.tokenizer
 
         # Delete the trainer itself
         del trainer

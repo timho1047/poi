@@ -1,8 +1,12 @@
 import os
+import time
 import warnings
+from contextlib import contextmanager
+from pathlib import Path
+from typing import TypedDict
 
 import torch
-from huggingface_hub import upload_file
+from huggingface_hub import repo_exists, upload_file
 from peft import get_peft_model, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForCausalLM,
@@ -13,7 +17,9 @@ from unsloth import FastLanguageModel
 from datasets import Dataset
 
 from .. import settings
+from ..dataset.llm import load_llm_dataset
 from ..llm import LLMConfig
+from .memory_utils import cleanup_trainer
 from .utils import generate_model_card, print_trainable_parameters, print_training_configuration
 
 # Suppress harmless warnings
@@ -21,140 +27,153 @@ warnings.filterwarnings("ignore", message=".*use_reentrant parameter.*")
 warnings.filterwarnings("ignore", message=".*MatMul8bitLt.*")
 
 
-def train_llm_fast_multi_gpu(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):
-    # Attribution: https://github.com/unslothai/unsloth/issues/2435#issuecomment-3436555056
+@contextmanager
+def ddp_context():
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    rank = int(os.environ.get("RANK", 0))
+    world_size = int(os.environ.get("WORLD_SIZE", 1))
+    is_dist = world_size > 1
 
-    LOCAL_RANK = int(os.environ.get("LOCAL_RANK", 0))
-    RANK = int(os.environ.get("RANK", 0))
-    WORLD_SIZE = int(os.environ.get("WORLD_SIZE", 1))
-    IS_DIST = WORLD_SIZE > 1
-    
-    if IS_DIST:
+    # Initialize DDP
+    if is_dist:
         if not torch.distributed.is_initialized():
             torch.distributed.init_process_group(backend="nccl", init_method="env://")
-        torch.cuda.set_device(LOCAL_RANK)
-    device = torch.device(f"cuda:{LOCAL_RANK}" if torch.cuda.is_available() else "cpu")
+        torch.cuda.set_device(local_rank)
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
 
-    print(f"RANK={RANK} LOCAL_RANK={LOCAL_RANK} WORLD_SIZE={WORLD_SIZE} device={device}")
-    
-    if RANK == 0:
-        print_training_configuration(config)
+    print(f"RANK={rank} LOCAL_RANK={local_rank} WORLD_SIZE={world_size} device={device}")
 
-    # Load model on the specific device for this rank
-    device_map = {"": f"cuda:{LOCAL_RANK}"} if torch.cuda.is_available() else None
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=config.model_id,
-        max_seq_length=config.max_length,
-        load_in_4bit=config.quantization_bits == 4,
-        load_in_8bit=config.quantization_bits == 8,
-        full_finetuning=False,
-        attn_implementation="flash_attention_2",
-        device_map=device_map,
-    )
-
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=config.lora_config.r,
-        target_modules=config.lora_config.target_modules,
-        lora_alpha=config.lora_config.lora_alpha,
-        lora_dropout=config.lora_config.lora_dropout,
-        bias=config.lora_config.bias,
-        use_gradient_checkpointing="unsloth",
-        random_state=settings.RANDOM_STATE,
-    )
-
-    # Configure training args
-    config.training_args.ddp_find_unused_parameters = False
-    config.training_args.dataset_text_field = "text"
-
-    trainer = SFTTrainer(
-        model=model,
-        args=config.training_args,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        tokenizer=tokenizer,
-    )
-
-    if RANK == 0:
-        print("Start training on main process...")
-
-    trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
-
-    # Only rank 0 saves the model
-    if RANK == 0:
-        print("Training complete. Saving model...")
-        model_card = generate_model_card(config)
-
-        if push_to_hub:
-            trainer.push_to_hub(commit_message=f"Training completed for {config.run_name}")
-            upload_file(
-                path_or_fileobj=model_card.encode("utf-8"),
-                path_in_repo="README.md",
-                repo_id=config.hub_id,
-                token=settings.HF_TOKEN,
-            )
-        else:
-            trainer.save_model(config.checkpoint_dir)
-
-        config.model_card_path.write_text(model_card)
-        print("Model saved successfully.")
+    yield local_rank, rank, world_size, device
 
     # Graceful DDP cleanup
-    if IS_DIST and torch.distributed.is_initialized():
+    if is_dist and torch.distributed.is_initialized():
         torch.distributed.barrier()
         torch.distributed.destroy_process_group()
 
-    return trainer
 
+def train_llm_fast_ddp(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):
+    # Attribution: https://github.com/unslothai/unsloth/issues/2435#issuecomment-3436555056
 
-def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):
-    print_training_configuration(config)
+    # Wrap the training in a DDP context, will fallback to single GPU training if not using DDP
+    with ddp_context() as (_, rank, _, device):
+        if rank == 0:
+            print_training_configuration(config)
 
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=config.model_id,
-        max_seq_length=config.max_length,
-        dtype=None,  # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
-        load_in_4bit=config.quantization_bits == 4,
-        load_in_8bit=config.quantization_bits == 8,
-        attn_implementation="flash_attention_2",
-        device_map="balanced",
-    )
-
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=config.lora_config.r,
-        target_modules=config.lora_config.target_modules,
-        lora_alpha=config.lora_config.lora_alpha,
-        lora_dropout=config.lora_config.lora_dropout,
-        bias=config.lora_config.bias,
-        use_gradient_checkpointing=config.training_args.gradient_checkpointing,
-        random_state=settings.RANDOM_STATE,
-    )
-
-    trainer = SFTTrainer(
-        model=model,
-        args=config.training_args,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        tokenizer=tokenizer,
-    )
-    trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
-
-    model_card = generate_model_card(config)
-
-    if push_to_hub:
-        trainer.push_to_hub(commit_message=f"Training completed for {config.run_name}")
-        upload_file(
-            path_or_fileobj=model_card.encode("utf-8"),
-            path_in_repo="README.md",
-            repo_id=config.hub_id,
-            token=settings.HF_TOKEN,
+        # Load model on the specific device for this rank
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=config.model_id,
+            max_seq_length=config.max_length,
+            load_in_4bit=config.quantization_bits == 4,
+            load_in_8bit=config.quantization_bits == 8,
+            full_finetuning=False,
+            attn_implementation="flash_attention_2",
+            device_map={"": device},
         )
-    else:
-        trainer.save_model(config.checkpoint_dir)
 
-    config.model_card_path.write_text(model_card)
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=config.lora_config.r,
+            target_modules=config.lora_config.target_modules,
+            lora_alpha=config.lora_config.lora_alpha,
+            lora_dropout=config.lora_config.lora_dropout,
+            bias=config.lora_config.bias,
+            use_gradient_checkpointing="unsloth",
+            random_state=settings.RANDOM_STATE,
+        )
+
+        trainer = SFTTrainer(
+            model=model,
+            args=config.training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+        )
+
+        if rank == 0:
+            print("Start training on main process...")
+
+        trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
+
+        # Only rank 0 saves the model
+        if rank == 0:
+            print("Training complete. Saving model...")
+            model_card = generate_model_card(config)
+
+            if push_to_hub:
+                trainer.push_to_hub(commit_message=f"Training completed for {config.run_name}")
+                upload_file(
+                    path_or_fileobj=model_card.encode("utf-8"),
+                    path_in_repo="README.md",
+                    repo_id=config.hub_id,
+                    token=settings.HF_TOKEN,
+                )
+            else:
+                trainer.save_model(config.output_dir)
+
+            config.model_card_path.write_text(model_card)
+            print("Model saved successfully.")
+
     return trainer
+
+
+class TrainLLMRun(TypedDict):
+    config: LLMConfig
+    train_dataset_path: Path
+    eval_dataset_path: Path | None
+    max_examples: int | None
+    push_to_hub: bool
+    force_push: bool
+
+
+def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
+    rank = int(os.environ.get("RANK", 0))
+    if rank == 0:
+        global_start_time = time.time()
+        if any(run["push_to_hub"] for run in runs):
+            assert settings.HF_TOKEN is not None, "HF_TOKEN is not set"
+
+    for idx, run in enumerate(runs, 1):
+        if rank == 0:
+            print(f"\n{'=' * 70}")
+            local_start_time = time.time()
+            print(f"Training: {run['config'].run_name}")
+            print(f"{'=' * 70}\n")
+
+        try:
+            train_dataset = load_llm_dataset(run["train_dataset_path"], max_examples=run["max_examples"])
+            eval_dataset = (
+                load_llm_dataset(run["eval_dataset_path"], max_examples=run["max_examples"]) if run["eval_dataset_path"] is not None else None
+            )
+
+            if not run["force_push"] and repo_exists(run["config"].hub_id):
+                if rank == 0:
+                    print(f"\n{'=' * 70}")
+                    print(f"Repo {run['config'].hub_id} already exists, skipping...")
+                    print(f"{'=' * 70}\n")
+            else:
+                trainer = train_llm_fast_ddp(run["config"], train_dataset, eval_dataset, run["push_to_hub"])
+                cleanup_trainer(trainer)
+
+        except Exception as e:
+            if rank == 0:
+                print(f"\n{'=' * 70}")
+                print(f"Error training {run['config'].run_name}, skipping...")
+                print(f"{'=' * 70}\n")
+                print(f"Error: {str(e)}")
+
+        finally:
+            if rank == 0:
+                print(f"\n{'=' * 70}")
+                print(f"Completed: {run['config'].run_name}")
+                print(f"Time taken for this run: {(time.time() - local_start_time) / 3600:.2f} hours")
+                print(f"Time taken for all runs: {(time.time() - global_start_time) / 3600:.2f} hours")
+                print(f"Completed {idx}/{len(runs)} runs")
+                print(f"{'=' * 70}\n")
+
+        if rank == 0:
+            print(f"\n{'=' * 70}")
+            print(f"All runs completed in {(time.time() - global_start_time) / 3600:.2f} hours!")
+            print(f"{'=' * 70}\n")
 
 
 def train_llm(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):
@@ -192,7 +211,7 @@ def train_llm(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, 
             token=settings.HF_TOKEN,
         )
     else:
-        trainer.save_model(config.checkpoint_dir)
+        trainer.save_model(config.output_dir)
 
     config.model_card_path.write_text(model_card)
     return trainer

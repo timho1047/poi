@@ -8,7 +8,7 @@ import os
 from poi import settings
 from poi.dataset.llm import load_llm_dataset
 from poi.llm import LLMConfig, cleanup_memory, print_memory_summary
-from poi.llm.trainer import train_llm_fast_multi_gpu
+from poi.llm.trainer import train_llm_fast_ddp
 
 
 def train_single_model(config: LLMConfig, train_dataset, eval_dataset, push_to_hub: bool = False):
@@ -31,7 +31,7 @@ def train_single_model(config: LLMConfig, train_dataset, eval_dataset, push_to_h
         print(f"Training: {config.run_name}")
         print(f"{'=' * 70}\n")
 
-    trainer = train_llm_fast_multi_gpu(config, train_dataset, eval_dataset, push_to_hub)
+    trainer = train_llm_fast_ddp(config, train_dataset, eval_dataset, push_to_hub)
 
     if rank == 0:
         print(f"\n{'=' * 70}")

@@ -23,13 +23,14 @@ def load_inference_model(config: LLMConfig, from_hub: bool = False):
         device_map="auto",
         trust_remote_code=True,
     )
-    model = PeftModel.from_pretrained(model, config.hub_id if from_hub else config.checkpoint_dir.as_posix())
+    model = PeftModel.from_pretrained(model, config.hub_id if from_hub else config.output_dir.as_posix())
     model.eval()
     return model
 
+
 def load_fast_inference_model(config: LLMConfig, from_hub: bool = False):
     model, _ = FastLanguageModel.from_pretrained(
-        model_name=config.hub_id if from_hub else config.checkpoint_dir.as_posix(),
+        model_name=config.hub_id if from_hub else config.output_dir.as_posix(),
         max_seq_length=config.max_length,
         dtype=None,
         load_in_4bit=config.quantization_bits == 4,
@@ -37,6 +38,7 @@ def load_fast_inference_model(config: LLMConfig, from_hub: bool = False):
     )
     model = FastLanguageModel.for_inference(model)
     return model
+
 
 @torch.inference_mode()
 def inference(config: LLMConfig, model: PeftModel, prompt: str):

@@ -149,7 +149,7 @@ def cleanup_trainer(trainer: SFTTrainer):
         trainer: The trainer object to clean up
     """
     if trainer is not None:
-        # Explicitly delete model and tokenizer from trainer
+        # Explicitly delete model from trainer
         if hasattr(trainer, "model"):
             del trainer.model
 

@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     DATASET_DIR = settings.DATASETS_DIR / "NYC"
 
-    train_dataset = load_tokenized_llm_dataset(DATASET_DIR / "LLM Dataset" / "train_codebook.json", tokenizer=config.tokenizer, max_examples=4)
+    train_dataset = load_tokenized_llm_dataset(DATASET_DIR / "LLM Dataset" / "train_codebook.json", config=config, max_examples=4)
 
     # if push_to_hub is True, the model will be pushed to the Hugging Face hub repo, otherwise it will be saved to the local directory
     train_llm_fast_ddp(config, train_dataset, None, push_to_hub=False)

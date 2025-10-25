@@ -152,10 +152,10 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
             trainer = None
             try:
                 train_dataset = load_tokenized_llm_dataset(
-                    run["train_dataset_path"], tokenizer=run["config"].tokenizer, max_examples=run["max_examples"]
+                    run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"]
                 )
                 eval_dataset = (
-                    load_tokenized_llm_dataset(run["eval_dataset_path"], tokenizer=run["config"].tokenizer, max_examples=run["max_examples"])
+                    load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
                     if run["eval_dataset_path"] is not None
                     else None
                 )

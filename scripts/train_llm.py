@@ -14,10 +14,10 @@ if __name__ == "__main__":
     max_examples = None
 
     train_dataset = load_tokenized_llm_dataset(
-        DATASET_DIR / "LLM Dataset" / "train_codebook.json", tokenizer=config.tokenizer, max_examples=max_examples
+        DATASET_DIR / "LLM Dataset" / "train_codebook.json", config=config, max_examples=max_examples
     )
     eval_dataset = load_tokenized_llm_dataset(
-        DATASET_DIR / "LLM Dataset" / "test_codebook.json", tokenizer=config.tokenizer, max_examples=max_examples
+        DATASET_DIR / "LLM Dataset" / "test_codebook.json", config=config, max_examples=max_examples
     )
 
     print(f"Train dataset size: {len(train_dataset)} examples")

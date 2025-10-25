@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from typing import TypedDict
 
@@ -11,28 +10,27 @@ class LLJsonRecord(TypedDict):
     output: str
 
 
+def format_example(ex: LLJsonRecord) -> dict[str, str]:
+    prompt = ex["instruction"] + "\n" + ex["input"] + " "
+    completion = ex["output"]
+    return {"prompt": prompt, "completion": completion}
+
+
 def load_llm_dataset(json_file_path: Path | str, max_examples: int = None) -> Dataset:
     """Load JSON data and convert to Hugging Face Dataset
-    
+
     Args:
         json_file_path: Path to the JSON file
         max_examples: Maximum number of examples to load, None for all examples
     Returns:
         Hugging Face Dataset
     """
-    if not isinstance(json_file_path, Path):
-        json_file_path = Path(json_file_path)
+    if isinstance(json_file_path, Path):
+        json_file_path = json_file_path.as_posix()
 
-    data = json.loads(json_file_path.read_text())
+    ds = Dataset.from_json(json_file_path)
     if max_examples is not None:
-        data = data[:max_examples]
+        ds = ds.select(range(0, max_examples))
+    ds = ds.map(format_example).remove_columns(["instruction", "input", "output"])
 
-    def format_chat_template(example: LLJsonRecord):
-        text = example["instruction"] + "\n" + example["input"] + " " + example["output"]
-        return {"text": text}
-
-    # Create Hugging Face Dataset
-    dataset = Dataset.from_list(data)
-    dataset = dataset.map(format_chat_template)
-
-    return dataset
+    return ds

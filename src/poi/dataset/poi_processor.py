@@ -91,7 +91,7 @@ class POIProcessor:
         df["Timezone Offset"] = pd.to_numeric(df["Timezone Offset"], errors="coerce").astype("Int64")
         df = df.dropna(subset=["UTC Time", "Timezone Offset"])
 
-        df["Local Time"] = (df["UTC Time"] + df["Timezone Offset"].apply(lambda x: timedelta(minutes=int(x)))).dt.strftime("%Y-%m-%d %H:%M")
+        df["Local Time"] = (df["UTC Time"] + df["Timezone Offset"].apply(lambda x: timedelta(minutes=int(x)))).dt.strftime("%Y-%m-%d %H:%M:%S")
 
         # Rename columns
         df.columns = ["Uid", "Pid", "Venue Category ID", "Catname", "Lat", "Lon", "Timezone Offset", "UTC Time", "Region", "Time"]
@@ -139,8 +139,8 @@ class POIProcessor:
         """Create POI information"""
         print("🔄 Creating POI info...")
 
-        # Process time
-        df["Time"] = pd.to_datetime(df["Time"]).dt.hour
+        # Process time - keep full datetime instead of just hour
+        df["Time"] = pd.to_datetime(df["Time"])
 
         # Create POI sequence
         poi_sequence = df.groupby("Uid").agg({"Pid": list, "Catname": list}).reset_index()
@@ -300,8 +300,8 @@ class POIProcessor:
                 results.append({"Uid": uid, "Pids": input_pids, "Times": input_times, "Target": target_pid, "Target_time": target_time})
 
         train = pd.DataFrame(results)
-        train["Times"] = train["Times"].apply(lambda x: [t.strftime("%Y-%m-%d %H:%M") for t in x])
-        train["Target_time"] = train["Target_time"].dt.strftime("%Y-%m-%d %H:%M")
+        train["Times"] = train["Times"].apply(lambda x: [t.strftime("%Y-%m-%d %H:%M:%S") for t in x])
+        train["Target_time"] = train["Target_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
         return train
 
@@ -367,8 +367,8 @@ class POIProcessor:
         test_df = pd.DataFrame(test_records)
 
         for df in [val_df, test_df]:
-            df["Times"] = df["Times"].apply(lambda x: [t.strftime("%Y-%m-%d %H:%M") for t in x])
-            df["Target_time"] = df["Target_time"].dt.strftime("%Y-%m-%d %H:%M")
+            df["Times"] = df["Times"].apply(lambda x: [t.strftime("%Y-%m-%d %H:%M:%S") for t in x])
+            df["Target_time"] = df["Target_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
         return val_df, test_df
 

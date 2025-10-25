@@ -42,7 +42,7 @@ def load_fast_inference_model(config: LLMConfig, from_hub: bool = False):
 
 @torch.inference_mode()
 def inference(config: LLMConfig, model: PeftModel, prompt: str):
-    inputs = config.tokenizer.encode(prompt, return_tensors="pt").to(model.device)
+    inputs = config.tokenizer(prompt, return_tensors="pt").to(model.device)
     outputs = model.generate(
         **inputs,
         max_new_tokens=256,

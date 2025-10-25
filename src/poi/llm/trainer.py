@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 import warnings
 from contextlib import contextmanager
@@ -6,7 +7,7 @@ from pathlib import Path
 from typing import TypedDict
 
 import torch
-from huggingface_hub import repo_exists, upload_file
+from huggingface_hub import create_repo, repo_exists, upload_file
 from peft import get_peft_model, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForCausalLM,
@@ -27,10 +28,7 @@ warnings.filterwarnings("ignore", message=".*use_reentrant parameter.*")
 warnings.filterwarnings("ignore", message=".*MatMul8bitLt.*")
 
 
-def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False, rank: int = 0):
-    if rank == 0:
-        print_training_configuration(config)
-
+def prepare_model(config: LLMConfig, rank: int = 0):
     device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
 
     # Load model on the specific device for this rank
@@ -54,12 +52,22 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
         use_gradient_checkpointing="unsloth",
         random_state=settings.RANDOM_STATE,
     )
+    return model, tokenizer
+
+
+def train_llm_fast(
+    config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False, rank: int = 0, manual_load_best_at_end: bool = False
+):
+    if rank == 0:
+        print_training_configuration(config)
+
+    model, tokenizer = prepare_model(config, rank)
 
     trainer = SFTTrainer(
         model=model,
         args=config.training_args,
         train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
+        eval_dataset=eval_dataset if not manual_load_best_at_end else None,
         tokenizer=tokenizer,
     )
 
@@ -86,6 +94,108 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
 
         config.model_card_path.write_text(model_card)
         print("Model saved successfully.")
+
+    return trainer, model, tokenizer
+
+
+def train_llm_fast_manual_load_best_at_end(
+    config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False, rank: int = 0
+):
+    EARLY_STOPPING_PATIENCE = 2
+
+    if config.do_eval:
+        raise ValueError("Please set do_eval to False when using manual load best at end.")
+
+    if rank == 0:
+        print_training_configuration(config)
+
+    # clear checkpoint directories
+    checkpoint_dirs = [d for d in config.output_dir.iterdir() if d.is_dir() and d.name.startswith("checkpoint-")]
+    for checkpoint_dir in checkpoint_dirs:
+        shutil.rmtree(checkpoint_dir)
+
+    model, tokenizer = prepare_model(config, rank)
+
+    
+
+    best_eval_loss = float("inf")
+    best_model_dir = Path(config.output_dir) / "best_model"
+    best_epoch = 0
+
+    # Set training args to train 1 epoch at a time
+    original_epochs = config.training_args.num_train_epochs
+
+    for epoch in range(int(original_epochs)):
+        if rank == 0:
+            print(f"\n{'=' * 50}")
+            print(f"Training Epoch {epoch + 1}/{int(original_epochs)}")
+            print(f"{'=' * 50}")
+
+        # Train for one epoch
+        config.training_args.num_train_epochs = epoch + 1
+        trainer = SFTTrainer(
+            model=model,
+            args=config.training_args,
+            train_dataset=train_dataset,
+            tokenizer=tokenizer,
+        )
+        trainer.train(resume_from_checkpoint=False if epoch == 0 else True)
+
+        # Evaluate after this epoch
+        eval_results = trainer.evaluate(eval_dataset=eval_dataset)
+        current_eval_loss = eval_results.get("eval_loss", float("inf"))
+
+        if rank == 0:
+            print(f"\nEpoch {epoch + 1} - Eval Loss: {current_eval_loss:.4f}")
+            print(f"Best Eval Loss so far: {best_eval_loss:.4f}")
+
+            # Save model if it's the best so far
+            if current_eval_loss < best_eval_loss:
+                print(f"✓ Eval loss improved from {best_eval_loss:.4f} to {current_eval_loss:.4f}")
+                print(f"Saving best model to {best_model_dir}")
+                best_eval_loss = current_eval_loss
+                best_epoch = epoch
+                trainer.save_model(str(best_model_dir))
+            else:
+                print(f"✗ Eval loss did not improve from {best_eval_loss:.4f}")
+
+            if epoch - best_epoch > EARLY_STOPPING_PATIENCE:
+                print(f"Early stopping at epoch {epoch}")
+                break
+
+    # Load the best model at the end (only on rank 0 to avoid DDP issues)
+    if rank == 0 and best_model_dir.exists():
+        print(f"\n{'=' * 50}")
+        print(f"Loading best model from {best_model_dir}")
+        print(f"Best eval loss: {best_eval_loss:.4f}")
+        print(f"{'=' * 50}")
+        # Copy best model to final output directory
+        for item in best_model_dir.iterdir():
+            dest = config.output_dir / item.name
+            if item.is_file():
+                shutil.copy2(item, dest)
+            elif item.is_dir():
+                if dest.exists():
+                    shutil.rmtree(dest)
+                shutil.copytree(item, dest)
+
+        model_card = generate_model_card(config)
+        config.model_card_path.write_text(model_card)
+
+        if push_to_hub:
+            from huggingface_hub import upload_folder
+
+            print(f"Uploading model to {config.hub_id}...")
+            if not repo_exists(config.hub_id, token=settings.HF_TOKEN):
+                create_repo(repo_id=config.hub_id, token=settings.HF_TOKEN, private=False)
+
+            upload_folder(
+                folder_path=str(config.output_dir),
+                repo_id=config.hub_id,
+                token=settings.HF_TOKEN,
+                commit_message=f"Training completed for {config.run_name} - Best eval loss: {best_eval_loss:.4f}",
+                ignore_patterns=["checkpoint-*", "best_model"],
+            )
 
     return trainer, model, tokenizer
 
@@ -150,10 +260,10 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
             train_dataset = None
             eval_dataset = None
             trainer = None
+            model = None
+            tokenizer = None
             try:
-                train_dataset = load_tokenized_llm_dataset(
-                    run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"]
-                )
+                train_dataset = load_tokenized_llm_dataset(run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"])
                 eval_dataset = (
                     load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
                     if run["eval_dataset_path"] is not None
@@ -166,7 +276,9 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
                         print(f"Repo {run['config'].hub_id} already exists, skipping...")
                         print(f"{'=' * 70}\n")
                 else:
-                    trainer, model, tokenizer = train_llm_fast(run["config"], train_dataset, eval_dataset, run["push_to_hub"], rank=rank)
+                    trainer, model, tokenizer = train_llm_fast_manual_load_best_at_end(
+                        run["config"], train_dataset, eval_dataset, run["push_to_hub"], rank=rank
+                    )
 
             except Exception as e:
                 if rank == 0:
@@ -174,6 +286,10 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
                     print(f"Error training {run['config'].run_name}, skipping...")
                     print(f"{'=' * 70}\n")
                     print(f"Error: {str(e)}")
+
+                # Synchronize all ranks after exception to prevent hanging
+                if world_size > 1 and torch.distributed.is_initialized():
+                    torch.distributed.barrier()
 
             finally:
                 # 1. Delete optimizer state from trainer

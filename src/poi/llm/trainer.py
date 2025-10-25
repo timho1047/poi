@@ -17,7 +17,7 @@ from unsloth import FastLanguageModel
 from datasets import Dataset
 
 from .. import settings
-from ..dataset.llm import load_llm_dataset
+from ..dataset.llm import load_tokenized_llm_dataset
 from ..llm import LLMConfig
 from .memory_utils import cleanup_memory
 from .utils import generate_model_card, print_trainable_parameters, print_training_configuration
@@ -151,9 +151,13 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
             eval_dataset = None
             trainer = None
             try:
-                train_dataset = load_llm_dataset(run["train_dataset_path"], max_examples=run["max_examples"])
+                train_dataset = load_tokenized_llm_dataset(
+                    run["train_dataset_path"], tokenizer=run["config"].tokenizer, max_examples=run["max_examples"]
+                )
                 eval_dataset = (
-                    load_llm_dataset(run["eval_dataset_path"], max_examples=run["max_examples"]) if run["eval_dataset_path"] is not None else None
+                    load_tokenized_llm_dataset(run["eval_dataset_path"], tokenizer=run["config"].tokenizer, max_examples=run["max_examples"])
+                    if run["eval_dataset_path"] is not None
+                    else None
                 )
 
                 if not run["force_push"] and repo_exists(run["config"].hub_id):
@@ -193,7 +197,7 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
                 # 3. Delete tokenizer
                 if tokenizer is not None:
                     del tokenizer
-                    
+
                 # 4. Delete datasets
                 if eval_dataset is not None:
                     del eval_dataset

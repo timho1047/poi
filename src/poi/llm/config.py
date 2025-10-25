@@ -86,7 +86,6 @@ class LLMConfig:
             hub_model_id=self.hub_id,
             hub_strategy="end",
             hub_token=settings.HF_TOKEN,
-            dataset_text_field="text",
             ###
             # Training parameters
             ###

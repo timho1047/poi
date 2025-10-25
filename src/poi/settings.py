@@ -24,7 +24,7 @@ CHECKPOINTS_DIR = OUTPUT_DIR / "checkpoints"
 LOGS_DIR = OUTPUT_DIR / "logs"
 
 DEVICE: Literal["cpu", "cuda", "mps"] = os.getenv("DEVICE", get_device())
-RANDOM_STATE = int(os.getenv("RANDOM_STATE", 43))
+RANDOM_STATE = int(os.getenv("RANDOM_STATE", 2024))
 
 # ===== Hugging Face 上传辅助 =====
 # 通过环境变量进行配置：

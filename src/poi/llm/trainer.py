@@ -104,6 +104,15 @@ class StopCallback(TrainerCallback):
     def on_epoch_end(self, args, state, control, logs=None, **kwargs):
         control.should_training_stop = True
 
+
+class SaveBestModelCallback(TrainerCallback):
+    def on_evaluate(self, args, state, control, **kwargs):
+        logs = state.log_history[-1]
+        current_eval_loss = logs.get("eval_loss", float("inf"))
+        best_eval_loss = state.best_metric
+        if current_eval_loss >= best_eval_loss:
+            control.should_save = True
+
 def train_llm_fast_manual_load_best_at_end(
     config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False, rank: int = 0
 ):
@@ -122,66 +131,70 @@ def train_llm_fast_manual_load_best_at_end(
 
     model, tokenizer = prepare_model(config, rank)
     
+    
+    
     trainer = SFTTrainer(
         model=model,
         args=config.training_args,
         train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         tokenizer=tokenizer,
-        callbacks=[StopCallback()],
+        callbacks=[SaveBestModelCallback()],
     )
-
     
-    best_eval_loss = float("inf")
-    best_model_dir = Path(config.output_dir) / "best_model"
-    best_epoch = 0
+    trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
+    
+    # best_eval_loss = float("inf")
+    # best_model_dir = Path(config.output_dir) / "best_model"
+    # best_epoch = 0
 
 
-    for epoch in range(int(config.training_args.num_train_epochs)):
-        if rank == 0:
-            print(f"\n{'=' * 50}")
-            print(f"Training Epoch {epoch + 1}/{int(config.training_args.num_train_epochs)}")
-            print(f"{'=' * 50}")
+    # for epoch in range(int(config.training_args.num_train_epochs)):
+    #     if rank == 0:
+    #         print(f"\n{'=' * 50}")
+    #         print(f"Training Epoch {epoch + 1}/{int(config.training_args.num_train_epochs)}")
+    #         print(f"{'=' * 50}")
 
-        # Train for one epoch
-        trainer.train(resume_from_checkpoint=False if epoch == 0 else True)
+    #     # Train for one epoch
+    #     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
 
         # Evaluate after this epoch
-        eval_results = trainer.evaluate(eval_dataset=eval_dataset)
-        current_eval_loss = eval_results.get("eval_loss", float("inf"))
+        # eval_results = trainer.evaluate(eval_dataset=eval_dataset)
+        # current_eval_loss = eval_results.get("eval_loss", float("inf"))
 
-        if rank == 0:
-            print(f"\nEpoch {epoch + 1} - Eval Loss: {current_eval_loss:.4f}")
-            print(f"Best Eval Loss so far: {best_eval_loss:.4f}")
+        # if rank == 0:
+        #     print(f"\nEpoch {epoch + 1} - Eval Loss: {current_eval_loss:.4f}")
+        #     print(f"Best Eval Loss so far: {best_eval_loss:.4f}")
 
-            # Save model if it's the best so far
-            if current_eval_loss < best_eval_loss:
-                print(f"✓ Eval loss improved from {best_eval_loss:.4f} to {current_eval_loss:.4f}")
-                print(f"Saving best model to {best_model_dir}")
-                best_eval_loss = current_eval_loss
-                best_epoch = epoch
-                trainer.save_model(str(best_model_dir))
-            else:
-                print(f"✗ Eval loss did not improve from {best_eval_loss:.4f}")
+        #     # Save model if it's the best so far
+        #     if current_eval_loss < best_eval_loss:
+        #         print(f"✓ Eval loss improved from {best_eval_loss:.4f} to {current_eval_loss:.4f}")
+        #         print(f"Saving best model to {best_model_dir}")
+        #         best_eval_loss = current_eval_loss
+        #         best_epoch = epoch
+        #         trainer.save_model(str(best_model_dir))
+        #     else:
+        #         print(f"✗ Eval loss did not improve from {best_eval_loss:.4f}")
 
-            if epoch - best_epoch > EARLY_STOPPING_PATIENCE:
-                print(f"Early stopping at epoch {epoch}")
-                break
+        #     if epoch - best_epoch > EARLY_STOPPING_PATIENCE:
+        #         print(f"Early stopping at epoch {epoch}")
+        #         break
 
     # Load the best model at the end (only on rank 0 to avoid DDP issues)
-    if rank == 0 and best_model_dir.exists():
-        print(f"\n{'=' * 50}")
-        print(f"Loading best model from {best_model_dir}")
-        print(f"Best eval loss: {best_eval_loss:.4f}")
-        print(f"{'=' * 50}")
-        # Copy best model to final output directory
-        for item in best_model_dir.iterdir():
-            dest = config.output_dir / item.name
-            if item.is_file():
-                shutil.copy2(item, dest)
-            elif item.is_dir():
-                if dest.exists():
-                    shutil.rmtree(dest)
-                shutil.copytree(item, dest)
+    if rank == 0:
+        # print(f"\n{'=' * 50}")
+        # print(f"Loading best model from {best_model_dir}")
+        # print(f"Best eval loss: {best_eval_loss:.4f}")
+        # print(f"{'=' * 50}")
+        # # Copy best model to final output directory
+        # for item in best_model_dir.iterdir():
+        #     dest = config.output_dir / item.name
+        #     if item.is_file():
+        #         shutil.copy2(item, dest)
+        #     elif item.is_dir():
+        #         if dest.exists():
+        #             shutil.rmtree(dest)
+        #         shutil.copytree(item, dest)
 
         model_card = generate_model_card(config)
         config.model_card_path.write_text(model_card)
@@ -197,7 +210,7 @@ def train_llm_fast_manual_load_best_at_end(
                 folder_path=str(config.output_dir),
                 repo_id=config.hub_id,
                 token=settings.HF_TOKEN,
-                commit_message=f"Training completed for {config.run_name} - Best eval loss: {best_eval_loss:.4f}",
+                commit_message=f"Training completed for {config.run_name}",
                 ignore_patterns=["checkpoint-*", "best_model"],
             )
 

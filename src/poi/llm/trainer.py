@@ -14,6 +14,7 @@ from transformers import (
 )
 from trl import SFTTrainer
 from unsloth import FastLanguageModel
+from transformers import TrainerCallback
 
 from datasets import Dataset
 
@@ -98,6 +99,11 @@ def train_llm_fast(
     return trainer, model, tokenizer
 
 
+# Stop training after each epoch
+class StopCallback(TrainerCallback):
+    def on_epoch_end(self, args, state, control, logs=None, **kwargs):
+        control.should_training_stop = True
+
 def train_llm_fast_manual_load_best_at_end(
     config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False, rank: int = 0
 ):
@@ -115,30 +121,28 @@ def train_llm_fast_manual_load_best_at_end(
         shutil.rmtree(checkpoint_dir)
 
     model, tokenizer = prepare_model(config, rank)
+    
+    trainer = SFTTrainer(
+        model=model,
+        args=config.training_args,
+        train_dataset=train_dataset,
+        tokenizer=tokenizer,
+        callbacks=[StopCallback()],
+    )
 
     
-
     best_eval_loss = float("inf")
     best_model_dir = Path(config.output_dir) / "best_model"
     best_epoch = 0
 
-    # Set training args to train 1 epoch at a time
-    original_epochs = config.training_args.num_train_epochs
 
-    for epoch in range(int(original_epochs)):
+    for epoch in range(int(config.training_args.num_train_epochs)):
         if rank == 0:
             print(f"\n{'=' * 50}")
-            print(f"Training Epoch {epoch + 1}/{int(original_epochs)}")
+            print(f"Training Epoch {epoch + 1}/{int(config.training_args.num_train_epochs)}")
             print(f"{'=' * 50}")
 
         # Train for one epoch
-        config.training_args.num_train_epochs = epoch + 1
-        trainer = SFTTrainer(
-            model=model,
-            args=config.training_args,
-            train_dataset=train_dataset,
-            tokenizer=tokenizer,
-        )
         trainer.train(resume_from_checkpoint=False if epoch == 0 else True)
 
         # Evaluate after this epoch

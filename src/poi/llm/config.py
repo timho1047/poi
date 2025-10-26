@@ -57,9 +57,10 @@ class LLMConfig:
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
-
+        
         checkpoint_dirs = [d for d in self.output_dir.iterdir() if d.is_dir() and d.name.startswith("checkpoint-")]
         self.resume_from_checkpoint = len(checkpoint_dirs) > 0 and self.resume_from_checkpoint
+
         self.bf16 = self.device == "cuda" and torch.cuda.is_bf16_supported()
 
         self.bnb_config = BNB_CONFIG_8BIT if self.quantization_bits == 8 else BNB_CONFIG_4BIT
@@ -80,7 +81,7 @@ class LLMConfig:
             run_name=self.run_name,
             eval_strategy="epoch" if self.do_eval else "no",
             save_total_limit=1,
-            load_best_model_at_end=self.do_eval and not self.do_ddp,  # Will cause hanging in DDP if True
+            load_best_model_at_end=False,
             save_strategy="epoch",
             max_length=self.max_length,
             hub_model_id=self.hub_id,

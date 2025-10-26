@@ -77,7 +77,7 @@ def evaluate_model(config: LLMConfig, model, eval_dataset: Dataset):
         args=config.training_args,
         train_dataset=eval_dataset,
         eval_dataset=eval_dataset,
-        tokenizer=config.tokenizer,
+        processing_class=config.tokenizer,
     )
 
     # Compute evaluation metrics

@@ -48,10 +48,10 @@ def inference(config: LLMConfig, model: PeftModel, prompt: str):
     inputs = config.tokenizer(prompt, return_tensors="pt").to(model.device)
     outputs = model.generate(
         **inputs,
-        max_new_tokens=256,
-        temperature=0.7,
-        top_p=0.9,
-        do_sample=True,
+        max_new_tokens=50,
+        # temperature=0.7,
+        # top_p=0.9,
+        # do_sample=True,
         pad_token_id=config.tokenizer.eos_token_id,
     )
     response = config.tokenizer.decode(outputs[0], skip_special_tokens=True)

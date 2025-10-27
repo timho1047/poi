@@ -1,7 +1,10 @@
 import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM
+from trl import SFTTrainer
 from unsloth import FastLanguageModel
+
+from datasets import Dataset
 
 from .config import LLMConfig
 
@@ -45,12 +48,43 @@ def inference(config: LLMConfig, model: PeftModel, prompt: str):
     inputs = config.tokenizer(prompt, return_tensors="pt").to(model.device)
     outputs = model.generate(
         **inputs,
-        max_new_tokens=256,
-        temperature=0.7,
-        top_p=0.9,
-        do_sample=True,
+        max_new_tokens=50,
+        # temperature=0.7,
+        # top_p=0.9,
+        # do_sample=True,
         pad_token_id=config.tokenizer.eos_token_id,
     )
     response = config.tokenizer.decode(outputs[0], skip_special_tokens=True)
     response = response[len(prompt) :]
     return response
+
+
+def evaluate_model(config: LLMConfig, model, eval_dataset: Dataset):
+    """
+    Compute evaluation loss on a dataset.
+
+    Args:
+        config: LLMConfig instance
+        model: The model to evaluate (can be from load_fast_inference_model or load_inference_model)
+        eval_dataset: Dataset with 'text' column (should be tokenized)
+
+    Returns:
+        dict: Evaluation metrics including loss, perplexity, etc.
+    """
+    # Create a trainer for evaluation
+    trainer = SFTTrainer(
+        model=model,
+        args=config.training_args,
+        train_dataset=eval_dataset,
+        eval_dataset=eval_dataset,
+        processing_class=config.tokenizer,
+    )
+
+    # Compute evaluation metrics
+    metrics = trainer.evaluate()
+
+    # Add perplexity if not already computed
+    if "eval_loss" in metrics and "eval_perplexity" not in metrics:
+        metrics["eval_perplexity"] = torch.exp(torch.tensor(metrics["eval_loss"])).item()
+
+    return metrics

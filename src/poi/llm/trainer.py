@@ -126,6 +126,53 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
     return trainer, model, tokenizer
 
 
+def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset | None = None, push_to_hub: bool = False):
+
+    print_training_configuration(config)
+
+    # Load model on the specific device for this rank
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=config.model_id,
+        max_seq_length=config.max_length,
+        load_in_4bit=False,
+        load_in_8bit=False,
+        full_finetuning=True,
+        attn_implementation="flash_attention_2",
+        device_map="auto",
+    )
+
+    trainer = SFTTrainer(
+        model=model,
+        args=config.training_args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        processing_class=tokenizer,
+    )
+    trainer.add_callback(SaveBestModelCallback(trainer, rank=0))
+
+    trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
+    
+    if push_to_hub:
+        model_card = generate_model_card(config)
+        config.model_card_path.write_text(model_card)
+
+        if push_to_hub:
+            print(f"Uploading model to {config.hub_id}...")
+            if not repo_exists(config.hub_id, token=settings.HF_TOKEN):
+                create_repo(repo_id=config.hub_id, token=settings.HF_TOKEN, private=False)
+
+            upload_folder(
+                folder_path=str(config.output_dir),
+                repo_id=config.hub_id,
+                token=settings.HF_TOKEN,
+                commit_message=f"Training completed for {config.run_name}",
+                ignore_patterns=["checkpoint-*"],
+            )
+
+    return trainer, model, tokenizer
+
+
+
 @contextmanager
 def ddp_context():
     local_rank = int(os.environ.get("LOCAL_RANK", 0))

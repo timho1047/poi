@@ -163,22 +163,21 @@ def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset:
 
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
     
+    model_card = generate_model_card(config)
+    config.model_card_path.write_text(model_card)
+    
     if push_to_hub:
-        model_card = generate_model_card(config)
-        config.model_card_path.write_text(model_card)
+        print(f"Uploading model to {config.hub_id}...")
+        if not repo_exists(config.hub_id, token=settings.HF_TOKEN):
+            create_repo(repo_id=config.hub_id, token=settings.HF_TOKEN, private=False)
 
-        if push_to_hub:
-            print(f"Uploading model to {config.hub_id}...")
-            if not repo_exists(config.hub_id, token=settings.HF_TOKEN):
-                create_repo(repo_id=config.hub_id, token=settings.HF_TOKEN, private=False)
-
-            upload_folder(
-                folder_path=str(config.output_dir),
-                repo_id=config.hub_id,
-                token=settings.HF_TOKEN,
-                commit_message=f"Training completed for {config.run_name}",
-                ignore_patterns=["checkpoint-*"],
-            )
+        upload_folder(
+            folder_path=str(config.output_dir),
+            repo_id=config.hub_id,
+            token=settings.HF_TOKEN,
+            commit_message=f"Training completed for {config.run_name}",
+            ignore_patterns=["checkpoint-*"],
+        )
 
     return trainer, model, tokenizer
 

@@ -5,7 +5,7 @@ from poi.llm.trainer import train_full_llm_fast
 
 if __name__ == "__main__":
     config = LLMConfig(
-        run_name="llama3-nyc-test-full-fintune", num_epochs=8, batch_size=4, gradient_accumulation_steps=4, do_eval=True, resume_from_checkpoint=False
+        run_name="llama3-nyc-test-full-fintune", num_epochs=8, batch_size=2, gradient_accumulation_steps=8, do_eval=True, resume_from_checkpoint=False
     )
 
     DATASET_DIR = settings.DATASETS_DIR / "NYC" / "LLM Dataset" / "paper"

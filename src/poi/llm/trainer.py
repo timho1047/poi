@@ -136,9 +136,20 @@ def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset:
         max_seq_length=config.max_length,
         load_in_4bit=False,
         load_in_8bit=False,
-        full_finetuning=True,
-        attn_implementation="flash_attention_2",
+        full_finetuning=False,
+        attn_implementation="sdpa",
         device_map="auto",
+    )
+    
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r=config.lora_config.r,
+        target_modules=config.lora_config.target_modules,
+        lora_alpha=config.lora_config.lora_alpha,
+        lora_dropout=config.lora_config.lora_dropout,
+        bias=config.lora_config.bias,
+        use_gradient_checkpointing="unsloth",
+        random_state=settings.RANDOM_STATE,
     )
 
     trainer = SFTTrainer(

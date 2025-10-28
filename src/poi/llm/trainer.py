@@ -127,7 +127,6 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
 
 
 def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset | None = None, push_to_hub: bool = False):
-
     print_training_configuration(config)
 
     # Load model on the specific device for this rank
@@ -140,7 +139,7 @@ def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset:
         attn_implementation="sdpa",
         device_map="auto",
     )
-    
+
     model = FastLanguageModel.get_peft_model(
         model,
         r=config.lora_config.r,
@@ -162,10 +161,10 @@ def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset:
     trainer.add_callback(SaveBestModelCallback(trainer, rank=0))
 
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
-    
+
     model_card = generate_model_card(config)
     config.model_card_path.write_text(model_card)
-    
+
     if push_to_hub:
         print(f"Uploading model to {config.hub_id}...")
         if not repo_exists(config.hub_id, token=settings.HF_TOKEN):
@@ -180,7 +179,6 @@ def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset:
         )
 
     return trainer, model, tokenizer
-
 
 
 @contextmanager
@@ -246,14 +244,29 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
             model = None
             tokenizer = None
             try:
-                train_dataset = load_tokenized_llm_dataset(run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"])
-                eval_dataset = (
-                    load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
-                    if run["eval_dataset_path"] is not None
-                    else None
-                )
+                for i in range(world_size):
+                    if i == rank:
+                        train_dataset = load_tokenized_llm_dataset(run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"])
+                        eval_dataset = (
+                            load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
+                            if run["eval_dataset_path"] is not None
+                            else None
+                        )
+                    if world_size > 1 and torch.distributed.is_initialized():
+                        torch.distributed.barrier()
 
-                if not run["force_push"] and repo_exists(run["config"].hub_id):
+                # Only rank 0 checks if repo exists, then broadcasts decision to all ranks
+                should_skip = False
+                if rank == 0:
+                    should_skip = not run["force_push"] and repo_exists(run["config"].hub_id)
+
+                # Broadcast the skip decision from rank 0 to all other ranks
+                if world_size > 1 and torch.distributed.is_initialized():
+                    should_skip_tensor = torch.tensor([should_skip], dtype=torch.bool, device=f"cuda:{rank}")
+                    torch.distributed.broadcast(should_skip_tensor, src=0)
+                    should_skip = should_skip_tensor.item()
+
+                if should_skip:
                     if rank == 0:
                         print(f"\n{'=' * 70}")
                         print(f"Repo {run['config'].hub_id} already exists, skipping...")

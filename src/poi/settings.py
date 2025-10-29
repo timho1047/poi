@@ -26,14 +26,9 @@ LOGS_DIR = OUTPUT_DIR / "logs"
 DEVICE: Literal["cpu", "cuda", "mps"] = os.getenv("DEVICE", get_device())
 RANDOM_STATE = int(os.getenv("RANDOM_STATE", 2024))
 
-# ===== Hugging Face 上传辅助 =====
-# 通过环境变量进行配置：
-# - HF_REPO: 目标仓库，格式为 "<username>/<repo_name>"
-# - HF_TOKEN: 访问令牌（建议设置为只读或写入token）
+# ===== Hugging Face =====
 HF_ORG = "comp5331poi"
-HF_REPO = os.getenv("HF_REPO")
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_PRIVATE = False
 
 
 # Initialize directories

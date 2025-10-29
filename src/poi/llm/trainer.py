@@ -20,8 +20,7 @@ from datasets import Dataset
 from .. import settings
 from ..dataset.llm import load_tokenized_llm_dataset
 from ..llm import LLMConfig
-from .memory_utils import cleanup_memory
-from .utils import generate_model_card, print_trainable_parameters, print_training_configuration
+from .utils import cleanup_memory, generate_model_card, print_trainable_parameters, print_training_configuration
 
 # Suppress harmless warnings
 warnings.filterwarnings("ignore", message=".*use_reentrant parameter.*")
@@ -101,12 +100,14 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
 
     if rank == 0:
         print("Start training on main process...")
-
-    trainer.add_callback(SaveBestModelCallback(trainer, rank=rank))
+    if config.do_eval:
+        trainer.add_callback(SaveBestModelCallback(trainer, rank=rank))
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
 
     # Push to hub
     if rank == 0:
+        if not config.do_eval:
+            trainer.save_model(config.output_dir)
         model_card = generate_model_card(config)
         config.model_card_path.write_text(model_card)
 
@@ -122,6 +123,61 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
                 commit_message=f"Training completed for {config.run_name}",
                 ignore_patterns=["checkpoint-*"],
             )
+
+    return trainer, model, tokenizer
+
+
+def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset | None = None, push_to_hub: bool = False):
+    print_training_configuration(config)
+
+    # Load model on the specific device for this rank
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=config.model_id,
+        max_seq_length=config.max_length,
+        load_in_4bit=False,
+        load_in_8bit=False,
+        full_finetuning=False,
+        attn_implementation="sdpa",
+        device_map="auto",
+    )
+
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r=config.lora_config.r,
+        target_modules=config.lora_config.target_modules,
+        lora_alpha=config.lora_config.lora_alpha,
+        lora_dropout=config.lora_config.lora_dropout,
+        bias=config.lora_config.bias,
+        use_gradient_checkpointing="unsloth",
+        random_state=settings.RANDOM_STATE,
+    )
+
+    trainer = SFTTrainer(
+        model=model,
+        args=config.training_args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        processing_class=tokenizer,
+    )
+    trainer.add_callback(SaveBestModelCallback(trainer, rank=0))
+
+    trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
+
+    model_card = generate_model_card(config)
+    config.model_card_path.write_text(model_card)
+
+    if push_to_hub:
+        print(f"Uploading model to {config.hub_id}...")
+        if not repo_exists(config.hub_id, token=settings.HF_TOKEN):
+            create_repo(repo_id=config.hub_id, token=settings.HF_TOKEN, private=False)
+
+        upload_folder(
+            folder_path=str(config.output_dir),
+            repo_id=config.hub_id,
+            token=settings.HF_TOKEN,
+            commit_message=f"Training completed for {config.run_name}",
+            ignore_patterns=["checkpoint-*"],
+        )
 
     return trainer, model, tokenizer
 
@@ -189,14 +245,29 @@ def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
             model = None
             tokenizer = None
             try:
-                train_dataset = load_tokenized_llm_dataset(run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"])
-                eval_dataset = (
-                    load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
-                    if run["eval_dataset_path"] is not None
-                    else None
-                )
+                for i in range(world_size):
+                    if i == rank:
+                        train_dataset = load_tokenized_llm_dataset(run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"])
+                        eval_dataset = (
+                            load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
+                            if run["eval_dataset_path"] is not None
+                            else None
+                        )
+                    if world_size > 1 and torch.distributed.is_initialized():
+                        torch.distributed.barrier()
 
-                if not run["force_push"] and repo_exists(run["config"].hub_id):
+                # Only rank 0 checks if repo exists, then broadcasts decision to all ranks
+                should_skip = False
+                if rank == 0:
+                    should_skip = not run["force_push"] and repo_exists(run["config"].hub_id)
+
+                # Broadcast the skip decision from rank 0 to all other ranks
+                if world_size > 1 and torch.distributed.is_initialized():
+                    should_skip_tensor = torch.tensor([should_skip], dtype=torch.bool, device=f"cuda:{rank}")
+                    torch.distributed.broadcast(should_skip_tensor, src=0)
+                    should_skip = should_skip_tensor.item()
+
+                if should_skip:
                     if rank == 0:
                         print(f"\n{'=' * 70}")
                         print(f"Repo {run['config'].hub_id} already exists, skipping...")

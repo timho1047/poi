@@ -100,12 +100,14 @@ def train_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset: Data
 
     if rank == 0:
         print("Start training on main process...")
-
-    trainer.add_callback(SaveBestModelCallback(trainer, rank=rank))
+    if config.do_eval:
+        trainer.add_callback(SaveBestModelCallback(trainer, rank=rank))
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
 
     # Push to hub
     if rank == 0:
+        if not config.do_eval:
+            trainer.save_model(config.output_dir)
         model_card = generate_model_card(config)
         config.model_card_path.write_text(model_card)
 

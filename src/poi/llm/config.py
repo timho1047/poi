@@ -29,8 +29,8 @@ class LLMConfig:
     # Training parameters
     lr: float = 1e-5
     lr_scheduler_type: str = "constant"
-    batch_size: int = 2
-    gradient_accumulation_steps: int = 32
+    batch_size: int = 8
+    gradient_accumulation_steps: int = 8
     num_epochs: int = 8
     quantization_bits: Literal[4, 8] = 4
     lora_rank: int = 16

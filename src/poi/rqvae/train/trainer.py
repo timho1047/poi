@@ -8,8 +8,6 @@ from ...rqvae.model import RQVAE
 from .config import RQVAEConfig
 from .hf import generate_model_card, upload_to_hf
 
-LOSS_TERMS = ["reconstruction", "quantization", "utilization", "compactness"]
-
 
 def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
     writer = SummaryWriter(log_dir=config.log_dir)  # 初始化TensorBoard日志目录
@@ -46,6 +44,7 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
 
     ## Training
 
+    loss_terms = list(config.loss_weights.keys()) #["reconstruction", "quantization", "utilization", "compactness", "kl_divergence"]
     rqvae_model.train()
     # ==== 断点续训：尝试加载 checkpoint ====
     start_epoch = 0
@@ -67,7 +66,7 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
     with tqdm(total=config.epoch_num, desc="Training") as epoch_pbar:
         epoch_pbar.update(start_epoch)  # resume progress bar
         for epoch in tqdm(range(start_epoch, config.epoch_num), desc="Training"):
-            total_loss_dict = {k: 0.0 for k in LOSS_TERMS}
+            total_loss_dict = {k: 0.0 for k in loss_terms}
 
             batch_loss = 0.0
 
@@ -82,7 +81,7 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
                     optimizer.zero_grad()
                     quantized, step_loss_dict, all_indices = rqvae_model(x)
 
-                    # loss = sum([step_loss_dict[k]*LOSS_WEIGHTS[k] for k in LOSS_TERMS])
+                    # loss = sum([step_loss_dict[k]*LOSS_WEIGHTS[k] for k in loss_terms])
                     recon = step_loss_dict["reconstruction"]
                     quant = step_loss_dict["quantization"]
                     div = step_loss_dict.get("utilization", 0.0)  # or 'diversity' if in model
@@ -91,27 +90,27 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
                     torch.nn.utils.clip_grad_norm_(rqvae_model.parameters(), max_norm=1.0)
                     optimizer.step()
                     # 累加到 total_loss_dict
-                    for k in LOSS_TERMS:
+                    for k in loss_terms:
                         total_loss_dict[k] += float(step_loss_dict.get(k, torch.tensor(0.0)).detach())
                     if step % 50 == 0:  # 每50个 batch 打印一次
-                        batch_loss = sum([step_loss_dict[k] * config.loss_weights[k] for k in LOSS_TERMS])
+                        batch_loss = sum([step_loss_dict[k] * config.loss_weights[k] for k in loss_terms])
                         pbar.update(50)
                         pbar.set_postfix({"batch_loss": f"{batch_loss:.4f}"})
 
                     # 只记录最后一批的 code indices 作为示例
                     if step == len(train_loader) - 1:
                         code_indices_log.append([inds.detach().cpu().numpy().tolist() for inds in all_indices])
-            total_loss = sum([total_loss_dict[k] * config.loss_weights[k] for k in LOSS_TERMS])
+            total_loss = sum([total_loss_dict[k] * config.loss_weights[k] for k in loss_terms])
             epoch_pbar.update(1)
             epoch_pbar.set_postfix(
                 {
                     "total_loss": round(float(total_loss), 4),
-                    **{k: round(float(total_loss_dict[k]), 4) for k in LOSS_TERMS},
+                    **{k: round(float(total_loss_dict[k]), 4) for k in loss_terms},
                 }
             )
             # TensorBoard 日志记录
             writer.add_scalar("Loss/total", total_loss, epoch)
-            for k in LOSS_TERMS:
+            for k in loss_terms:
                 writer.add_scalar(f"Loss/{k}", total_loss_dict[k], epoch)
             # 保存最优模型
             if total_loss < best_loss:

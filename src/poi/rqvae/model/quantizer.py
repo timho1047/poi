@@ -54,10 +54,20 @@ class VectorQuantizer(nn.Module):
         util_loss = torch.mean(torch.abs(counts - batch_size / self.vector_num))
         compact_loss = 2 * torch.mean(torch.pdist(self.vectors.weight, p=2))
         # div_loss = util_loss + compact_loss
+        
+        usage_prob = counts / batch_size 
+        target_prob = torch.ones(self.vector_num, device=x.device) / self.vector_num
+        
+        kl_loss = F.kl_div(
+            torch.log(usage_prob + 1e-8),
+            target_prob, 
+            reduction='batchmean'
+        )
 
         cur_loss["quantization"] = quant_loss
         cur_loss["utilization"] = util_loss
         cur_loss["compactness"] = compact_loss
+        cur_loss["kl_divergence"] = kl_loss
 
         ## EMA update
         with torch.no_grad():
@@ -92,7 +102,7 @@ class ResidualVectorQuantizer(nn.Module):
                 for _ in range(codebook_num)
             ]
         )
-        self.loss_items = ["quantization", "utilization", "compactness"]
+        self.loss_items = ["quantization", "utilization", "compactness", "kl_divergence"]
 
     def forward(self, x):
         quantized = 0

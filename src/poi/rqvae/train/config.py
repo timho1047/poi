@@ -28,6 +28,7 @@ class RQVAEConfig:
     div_weight: float = 0.25
     commitment_weight: float = 0.5
     recon_weight: float = 1.0
+    use_kl_divergence: bool = False
     random_state: int = settings.RANDOM_STATE
 
     # Inferred configs, no need to provide during initialization
@@ -64,10 +65,13 @@ class RQVAEConfig:
         self.vector_num = 32 if self.dataset_name == "NYC" else 64
         self.loss_weights = {
             "reconstruction": self.recon_weight,
-            "quantization": self.quant_weight,
-            "utilization": self.div_weight,
-            "compactness": self.div_weight,
+            "quantization": self.quant_weight
         }
+        if not self.use_kl_divergence:
+            self.loss_weights["utilization"] = self.div_weight
+            self.loss_weights["compactness"] = self.div_weight
+        else:
+            self.loss_weights["kl_divergence"] = self.div_weight
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)

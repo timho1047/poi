@@ -12,7 +12,7 @@ class RQVAEConfig:
     dataset_name: Literal["NYC", "TKY"] = "TKY"
     batch_size: int = 128
     epoch_num: int = 50
-    lr: float = 1e-5
+    lr: float = 1e-3
     run_name: str = "rqvae-1"
 
     num_dataloader_workers: int = 4  # 数据加载并行进程数，可根据 CPU 核数调整（2~8）
@@ -22,14 +22,15 @@ class RQVAEConfig:
     codebook_num: int = 3
     vector_num: int = 64
     vector_dim: int = 64
-    vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 512, 1024])
+    vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 256, 512])
 
     quant_weight: float = 1.0
     div_weight: float = 0.25
-    commitment_weight: float = 0.5
+    commitment_weight: float = 0.25
     recon_weight: float = 1.0
     use_kl_divergence: bool = False
     random_state: int = settings.RANDOM_STATE
+    dropout_rate: float = 0.1
 
     # Inferred configs, no need to provide during initialization
     dataset_path: Path = field(init=False)

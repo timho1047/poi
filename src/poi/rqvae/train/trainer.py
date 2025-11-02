@@ -21,9 +21,10 @@ def train_rqvae(config: RQVAEConfig, push_to_hub: bool = False):
         codebook_num=config.codebook_num,
         commitment_weight=config.commitment_weight,
         random_state=config.random_state,
+        dropout_rate=config.dropout_rate,
     ).to(config.device)
 
-    optimizer = optim.Adam(
+    optimizer = optim.AdamW(
         rqvae_model.parameters(),
         lr=config.lr,
         # betas=(0.9, 0.98),

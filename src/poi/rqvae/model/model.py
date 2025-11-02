@@ -15,13 +15,14 @@ class RQVAE(nn.Module):
         codebook_num,
         commitment_weight,
         random_state,
+        dropout_rate,
     ):
         super().__init__()
 
         ## Encoder will rearrange the hidden dims decreasingly (downsampling)
         ## while Decoder will rearrange them increasingly (upsampling)
-        self.encoder = Encoder(embedding_dim, vae_hidden_dims, vector_dim)
-        self.decoder = Decoder(vector_dim, vae_hidden_dims, embedding_dim)
+        self.encoder = Encoder(embedding_dim, vae_hidden_dims, vector_dim, dropout_rate)
+        self.decoder = Decoder(vector_dim, vae_hidden_dims, embedding_dim, dropout_rate)
         self.quantizer = ResidualVectorQuantizer(
             codebook_num, vector_num, vector_dim, commitment_weight
         )

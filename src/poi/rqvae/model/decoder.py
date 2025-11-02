@@ -2,7 +2,7 @@ from torch import nn
 
 
 class Decoder(nn.Module):
-    def __init__(self, input_dim, hidden_dims, output_dim):
+    def __init__(self, input_dim, hidden_dims, output_dim, dropout_rate):
         super().__init__()
         layers = []
         hidden_dims = sorted(hidden_dims, reverse=False)
@@ -14,6 +14,7 @@ class Decoder(nn.Module):
                     nn.Linear(prev_dim, hidden_dim),
                     nn.BatchNorm1d(hidden_dim),
                     nn.ReLU(inplace=True),
+                    nn.Dropout(p=dropout_rate), 
                 ]
             )
             prev_dim = hidden_dim

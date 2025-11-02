@@ -11,7 +11,8 @@ class RQVAEConfig:
     # Training parameters
     dataset_name: Literal["NYC", "TKY"] = "TKY"
     batch_size: int = 128
-    epoch_num: int = 50
+    epoch_num: int = 3000
+    diversity_start_epoch: int = 1000
     lr: float = 1e-3
     run_name: str = "rqvae-1"
 
@@ -64,6 +65,7 @@ class RQVAEConfig:
         # - NYC: 3 layers × 32 codewords × 64 dims
         # - TKY/GWL: 3 layers × 64 codewords × 64 dims
         self.vector_num = 32 if self.dataset_name == "NYC" else 64
+        
         self.loss_weights = {
             "reconstruction": self.recon_weight,
             "quantization": self.quant_weight
@@ -73,6 +75,8 @@ class RQVAEConfig:
             self.loss_weights["compactness"] = self.div_weight
         else:
             self.loss_weights["kl_divergence"] = self.div_weight
+        self.loss_terms = list(self.loss_weights.keys())         
+        self.diversity_terms = ["utilization", "compactness", "kl_divergence"]
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)

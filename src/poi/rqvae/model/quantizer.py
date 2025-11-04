@@ -128,7 +128,7 @@ class ResidualVectorQuantizer(nn.Module):
 
         for layer_idx, quantizer in enumerate(self.quantizers):
             kmeans = KMeans(
-                n_clusters=quantizer.vector_num, random_state=random_state, n_init=10
+                n_clusters=quantizer.vector_num, random_state=random_state, max_iter=100 #n_init=10
             )
             kmeans.fit(residual.detach().cpu().numpy())
             # 将 k-means 聚类中心写入该层的 codebook 向量

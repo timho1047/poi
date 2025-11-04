@@ -37,6 +37,7 @@ def load_inference_model(config: RQVAEConfig, from_hub: bool = False):
         codebook_num=config.codebook_num,
         commitment_weight=config.commitment_weight,
         random_state=config.random_state,
+        dropout_rate=config.dropout_rate,
     ).to(config.device)
 
     if from_hub:

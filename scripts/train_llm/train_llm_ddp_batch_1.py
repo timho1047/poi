@@ -84,16 +84,16 @@ RUN_ITEMS: list[CreateRunBatchItem] = [
 ### Training configurations
 ########################################################
 NUM_EPOCHS = 8
-BATCH_SIZE = 2
+BATCH_SIZE = 4
 GRADIENT_ACCUMULATION_STEPS = 2
 DO_DDP = True
 DO_EVAL = True
-MAX_EXAMPLES = 10
-PUSH_TO_HUB = False
+MAX_EXAMPLES = None
+PUSH_TO_HUB = True
 FORCE_PUSH = False
 
 SCRIPT_PATH = settings.ROOT_DIR / "scripts/train_llm/train_llm_ddp_single.py"
-NPROC_PER_NODE = 1
+NPROC_PER_NODE = 8
 
 if __name__ == "__main__":
     runs = create_run_batch(RUN_ITEMS, NUM_EPOCHS, BATCH_SIZE, GRADIENT_ACCUMULATION_STEPS, DO_DDP, DO_EVAL, MAX_EXAMPLES, PUSH_TO_HUB, FORCE_PUSH)

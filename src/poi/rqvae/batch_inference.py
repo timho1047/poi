@@ -51,7 +51,7 @@ class ModelConfigParser:
         
         # Extract commitment_weight
         commit_match = re.search(r'commit(\d+\.?\d*)', model_name)
-        commitment_weight = float(commit_match.group(1)) if commit_match else 0.5
+        commitment_weight = float(commit_match.group(1)) if commit_match else 0.25
         
         # Extract learning rate
         lr_match = re.search(r'lr(\d+)e-(\d+)', model_name)
@@ -61,7 +61,11 @@ class ModelConfigParser:
             lr = 5e-5
         
         # Check for special flags
-        quant_weight = 0.0 if 'without_L_quant' in model_name else 1.0
+        lower_name = model_name.lower()
+        quant_weight = 0.0 if 'without_l_quant' in lower_name else 1.0
+        # New variants: without reconstruction term, or using KL
+        recon_weight = 0.0 if 'without_l_reconstruction' in lower_name else 1.0
+        use_kl_divergence = 'withkl' in lower_name
         
         return {
             'dataset_name': dataset_name,
@@ -69,6 +73,8 @@ class ModelConfigParser:
             'commitment_weight': commitment_weight,
             'lr': lr,
             'quant_weight': quant_weight,
+            'recon_weight': recon_weight,
+            'use_kl_divergence': use_kl_divergence,
             'run_name': model_name
         }
 
@@ -76,8 +82,10 @@ class ModelConfigParser:
 class BatchInferenceProcessor:
     """Handles the complete inference pipeline for a single RQ-VAE model."""
     
-    def __init__(self, hf_token: str):
+    def __init__(self, hf_token: str, base_folder: str | None = None):
         self.hf_token = hf_token
+        # Base folder on HF dataset repo to upload results, default "LLM Dataset"
+        self.base_folder = base_folder or os.getenv("HF_LLM_DATASET_DIR", "LLM Dataset")
     
     def process_model(self, model_id: str) -> None:
         """Process a single RQ-VAE model: load, infer, and upload results to Hugging Face."""
@@ -95,6 +103,12 @@ class BatchInferenceProcessor:
         print(f"📋 Loaded PID mapping with {len(pid_mapping)} POIs")
         
         # Get data loader WITHOUT shuffle to maintain consistent order
+        # Allow overriding num_workers via env to avoid multiprocessing issues in some environments
+        try:
+            override_workers = int(os.getenv("DATALOADER_NUM_WORKERS", str(config.num_dataloader_workers)))
+        except ValueError:
+            override_workers = config.num_dataloader_workers
+        config.num_dataloader_workers = override_workers
         train_loader = get_dataloader(
             config.dataset_path, 
             batch_size=config.batch_size, 
@@ -162,12 +176,12 @@ class BatchInferenceProcessor:
         dataset_id = f"{HF_ORG}/{config.dataset_name.lower()}"
         upload_file(
             path_or_fileobj=local_path,
-            path_in_repo=f"LLM Dataset/Intermediate Files/{filename}",
+            path_in_repo=f"{self.base_folder}/Intermediate Files/{filename}",
             repo_id=dataset_id,
             repo_type="dataset",
             token=self.hf_token
         )
-        print(f"✅ Uploaded to {dataset_id}/LLM Dataset/Intermediate Files/{filename}")
+        print(f"✅ Uploaded to {dataset_id}/{self.base_folder}/Intermediate Files/{filename}")
         
         # Clean up temporary file
         os.remove(local_path)
@@ -177,9 +191,9 @@ class BatchInferenceProcessor:
 class BatchInferenceManager:
     """Manages batch processing of multiple RQ-VAE models."""
     
-    def __init__(self, hf_token: str):
+    def __init__(self, hf_token: str, base_folder: str | None = None):
         self.hf_token = hf_token
-        self.processor = BatchInferenceProcessor(hf_token)
+        self.processor = BatchInferenceProcessor(hf_token, base_folder)
         
         # Define all target models
         self.target_models = [

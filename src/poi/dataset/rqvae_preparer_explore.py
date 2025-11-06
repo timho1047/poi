@@ -76,6 +76,7 @@ class RQVAEPreparer:
 
         return vec
     
+    ## Update
     def get_new_collaborative_feat(self, user_visit_history, total_dim: int, padding_value: int = 100):
         #zip(user_list, recency_list)
         vec = np.zeros(total_dim, dtype=np.float32)
@@ -152,6 +153,7 @@ class RQVAEPreparer:
 
             # 4. Collaborative (user) 10-hot
             # user_vec = self.create_multihot(user_list, num_users, top_k=10)
+            ## Update
             user_vec = self.get_new_collaborative_feat(zip(user_list, recency_list), num_users, padding_value=100)
 
             # Concatenate all features

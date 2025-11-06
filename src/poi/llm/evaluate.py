@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from datasets import Dataset
 
-from ..dataset.llm import load_prompt_completion_llm_dataset
+from ..dataset.llm import load_prompt_completion_llm_dataset, find_all_user_sids_in_dataset, filter_test
 from ..llm import load_fast_inference_model
 from .config import LLMConfig
 from .inference import inference
@@ -28,7 +28,7 @@ def top_one_accuracy(config: LLMConfig, model, ds: Dataset, is_sid: bool = True)
     return correct / total
 
 
-def evaluate_model(config: LLMConfig, ds_dir: Path, from_hub: bool = True):
+def evaluate_model(config: LLMConfig, ds_dir: Path, from_hub: bool = True, test_filter = True):
     if not ds_dir.exists():
         raise ValueError(f"Dataset path {ds_dir} does not exist")
 
@@ -52,6 +52,11 @@ def evaluate_model(config: LLMConfig, ds_dir: Path, from_hub: bool = True):
     val_ds = load_prompt_completion_llm_dataset(val_ds_path) if val_ds_path else None
     test_all_ds = load_prompt_completion_llm_dataset(test_all_ds_path) if test_all_ds_path else None
     test_ds = load_prompt_completion_llm_dataset(test_ds_path)
+    
+    if test_filter:
+        test_users, test_sids = find_all_user_sids_in_dataset(test_ds)
+        train_users, train_sids = find_all_user_sids_in_dataset(train_ds)
+        test_ds = test_ds.filter(filter_test, fn_kwargs={"filter_users": test_users - train_users, "filter_sids": test_sids - train_sids})
 
     is_sid = "codebook" in train_ds_path.name.lower()
 
@@ -70,7 +75,7 @@ def evaluate_model(config: LLMConfig, ds_dir: Path, from_hub: bool = True):
     }
 
 
-def evaluate_all_and_save(config_ds_dir_pairs: list[tuple[LLMConfig, Path]], save_path: Path, from_hub: bool = True):
+def evaluate_all_and_save(config_ds_dir_pairs: list[tuple[LLMConfig, Path]], save_path: Path, from_hub: bool = True, test_filter = True):
     if not save_path.exists():
         save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text("run_name,train_acc,val_acc,test_all_acc,test_acc\n")
@@ -84,7 +89,7 @@ def evaluate_all_and_save(config_ds_dir_pairs: list[tuple[LLMConfig, Path]], sav
             continue
         pbar.set_description(f"Evaluating {config.run_name}")
         
-        metrics = evaluate_model(config, ds_dir, from_hub)
+        metrics = evaluate_model(config, ds_dir, from_hub, test_filter)
         train_acc = f"{metrics['train_acc']:.4f}"
         test_acc = f"{metrics['test_acc']:.4f}"
         val_acc = f"{metrics['val_acc']:.4f}" if metrics['val_acc'] else "-"

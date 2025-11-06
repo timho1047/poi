@@ -12,16 +12,17 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
 import torch
-from huggingface_hub import hf_hub_download, upload_file
+from huggingface_hub import create_repo, hf_hub_download, upload_file
 
 
 class RQVAEPreparer:
     """RQ-VAE Data Preparer"""
 
-    def __init__(self, dataset_name: str, hf_org: str = "comp5331poi"):
+    def __init__(self, dataset_name: str, hf_org: str = "comp5331poi", hf_token: str = None):
         self.dataset_name = dataset_name
         self.hf_org = hf_org
         self.hf_repo = f"{hf_org}/{dataset_name}"
+        self.hf_token = hf_token or os.environ.get("HF_TOKEN")
 
     def download_from_hf(self, filename: str, local_path: str) -> str:
         """Download file from Hugging Face"""
@@ -32,10 +33,30 @@ class RQVAEPreparer:
             print(f"❌ Error downloading {filename}: {e}")
             raise
 
+    def ensure_repo_exists(self) -> None:
+        """Ensure the Hugging Face repository exists"""
+        try:
+            create_repo(
+                repo_id=self.hf_repo,
+                repo_type="dataset",
+                private=False,
+                exist_ok=True,
+                token=self.hf_token
+            )
+            print(f"✅ Repository ready: {self.hf_repo}")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not create/verify repository {self.hf_repo}: {e}")
+
     def upload_to_hf(self, local_path: str, hf_path: str) -> None:
         """Upload file to Hugging Face"""
         try:
-            upload_file(path_or_fileobj=local_path, path_in_repo=hf_path, repo_id=self.hf_repo, repo_type="dataset")
+            upload_file(
+                path_or_fileobj=local_path,
+                path_in_repo=hf_path,
+                repo_id=self.hf_repo,
+                repo_type="dataset",
+                token=self.hf_token
+            )
             print(f"✅ Uploaded {local_path} to {hf_path}")
         except Exception as e:
             print(f"❌ Error uploading {hf_path}: {e}")
@@ -188,6 +209,8 @@ class RQVAEPreparer:
 
     def save_and_upload(self, poi_features: np.ndarray, metadata: Dict[str, Any], pid_to_idx: Dict[int, int]) -> None:
         """Save data and upload to HF"""
+        print("🔄 Ensuring repository exists...")
+        self.ensure_repo_exists()
         print("🔄 Saving and uploading data...")
 
         # Create temporary directory

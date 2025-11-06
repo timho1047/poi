@@ -10,31 +10,54 @@ from datetime import timedelta
 from typing import Dict, Tuple
 
 import pandas as pd
-from huggingface_hub import hf_hub_download, upload_file
+from huggingface_hub import create_repo, hf_hub_download, upload_file
 from openlocationcode import openlocationcode as olc
 
 
 class POIProcessor:
     """POI Data Processor"""
 
-    def __init__(self, dataset_name: str, hf_org: str = "comp5331poi"):
+    def __init__(self, dataset_name: str, hf_org: str = "comp5331poi", hf_token: str = None):
         self.dataset_name = dataset_name
         self.hf_org = hf_org
         self.hf_repo = f"{hf_org}/{dataset_name}"
+        self.hf_token = hf_token or os.environ.get("HF_TOKEN")
 
-    def download_from_hf(self, filename: str, local_path: str) -> str:
+    def download_from_hf(self, filename: str, local_path: str, source_repo: str = None) -> str:
         """Download file from Hugging Face"""
         try:
-            downloaded_path = hf_hub_download(repo_id=self.hf_repo, filename=filename, repo_type="dataset")
+            repo_id = source_repo if source_repo else self.hf_repo
+            downloaded_path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type="dataset")
             return downloaded_path
         except Exception as e:
             print(f"❌ Error downloading {filename}: {e}")
             raise
 
+    def ensure_repo_exists(self) -> None:
+        """Ensure the Hugging Face repository exists"""
+        try:
+            create_repo(
+                repo_id=self.hf_repo,
+                repo_type="dataset",
+                private=False,
+                exist_ok=True,
+                token=self.hf_token
+            )
+            print(f"✅ Repository ready: {self.hf_repo}")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not create/verify repository {self.hf_repo}: {e}")
+            # Don't raise, as the repo might already exist
+
     def upload_to_hf(self, local_path: str, hf_path: str) -> None:
         """Upload file to Hugging Face"""
         try:
-            upload_file(path_or_fileobj=local_path, path_in_repo=hf_path, repo_id=self.hf_repo, repo_type="dataset")
+            upload_file(
+                path_or_fileobj=local_path,
+                path_in_repo=hf_path,
+                repo_id=self.hf_repo,
+                repo_type="dataset",
+                token=self.hf_token
+            )
             print(f"✅ Uploaded {local_path} to {hf_path}")
         except Exception as e:
             print(f"❌ Error uploading {hf_path}: {e}")
@@ -70,11 +93,27 @@ class POIProcessor:
         """Process raw CSV data"""
         print(f"🔄 Processing raw data for {self.dataset_name}...")
 
-        # Download raw data from HF
-        raw_data_path = self.download_from_hf(f"{self.dataset_name} base.csv", f"/tmp/{self.dataset_name}_base.csv")
+        # For exploration datasets, download from original dataset
+        # e.g., NYC_Exploration -> download from NYC/NYC base.csv
+        if "_Exploration" in self.dataset_name or "_exploration" in self.dataset_name.lower():
+            base_dataset_name = self.dataset_name.replace("_Exploration", "").replace("_exploration", "")
+            base_repo = f"{self.hf_org}/{base_dataset_name}"
+            base_filename = f"{base_dataset_name} base.csv"
+            print(f"📥 Downloading base data from {base_repo}/{base_filename}...")
+            raw_data_path = self.download_from_hf(base_filename, f"/tmp/{self.dataset_name}_base.csv", source_repo=base_repo)
+        else:
+            # Download raw data from HF
+            raw_data_path = self.download_from_hf(f"{self.dataset_name} base.csv", f"/tmp/{self.dataset_name}_base.csv")
 
         # Read data
         df = pd.read_csv(raw_data_path, sep=",", encoding="latin-1", header=0)
+
+        # Rename columns to standard names
+        df = df.rename(columns={
+            "User ID": "Uid",
+            "Venue ID": "Pid",
+            "Venue Category Name": "Catname"
+        })
 
         # Process coordinates
         df["Latitude"] = pd.to_numeric(df["Latitude"], errors="coerce")
@@ -94,7 +133,7 @@ class POIProcessor:
         latest_month = df.sort_values("UTC Time", ascending=False)["year_month"].iloc[0]
         all_months = len(list(set(df["year_month"].values.tolist())))
         print("Latest month is:", latest_month)
-        df["Visit Recency"] = (latest_month - df["year_month"]).apply(lambda x: x.n if x.n<int(all_months*0.8) else 100)
+        df["Visit Recency"] = (latest_month - df["year_month"]).apply(lambda x: x.n)
         # 100 means no visit in latest 6 months, 0~5 means visits in latest x+1 months
         
         df["Timezone Offset"] = pd.to_numeric(df["Timezone Offset"], errors="coerce").astype("Int64")
@@ -102,9 +141,21 @@ class POIProcessor:
 
         df["Local Time"] = (df["UTC Time"] + df["Timezone Offset"].apply(lambda x: timedelta(minutes=int(x)))).dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Rename columns
-        df.columns = ["Uid", "Pid", "Venue Category ID", "Catname", "Lat", "Lon", "year_month", "Visit Recency", "Timezone Offset", "UTC Time", "Region", "Time"]
-        df = df[["Uid", "Pid", "Catname", "Region", "Time", "Visit Recency"]]
+        # Rename Local Time to Time
+        df = df.rename(columns={"Local Time": "Time"})
+        
+        # Ensure Visit Recency is integer type before selecting columns
+        df["Visit Recency"] = df["Visit Recency"].astype(int)
+        
+        # Select and reorder columns - check if all columns exist
+        required_columns = ["Uid", "Pid", "Catname", "Region", "Time", "Visit Recency"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"⚠️  Missing columns: {missing_columns}")
+            print(f"Available columns: {df.columns.tolist()}")
+            raise ValueError(f"Required columns not found: {missing_columns}")
+        
+        df = df[required_columns]
 
         # Filter data
         filtered_df = self.filter_data(df, poi_min_freq, user_min_freq)
@@ -165,7 +216,8 @@ class POIProcessor:
             # Keep only the latest visit of each user
             group_deduped = group.sort_values("Visit Recency", ascending=True).drop_duplicates(subset=["Uid"], keep='first')
             uid_list = group_deduped["Uid"].tolist()
-            recency_list = group_deduped["Visit Recency"].tolist()
+            # Ensure Visit Recency is integer
+            recency_list = [int(x) if pd.notna(x) else 100 for x in group_deduped["Visit Recency"].tolist()]
             
             catname = group["Catname"].iloc[0]
             region = group["Region"].iloc[0]
@@ -438,6 +490,9 @@ class POIProcessor:
         )
 
         # Save data files
+        # Ensure Visit Recency is integer before saving
+        if "Visit Recency" in df.columns:
+            df["Visit Recency"] = df["Visit Recency"].astype(int)
         df.to_csv(f"{temp_dir}/data.csv", index=False)
         poi_info.to_csv(f"{temp_dir}/poi_info.csv", index=False)
         train_df.to_csv(f"{temp_dir}/train_data.csv", index=False)
@@ -450,6 +505,8 @@ class POIProcessor:
         sequences["test_all"].to_csv(f"{temp_dir}/data/test_all.csv", index=False)
 
         # 7. Upload to HF
+        print("🔄 Ensuring repository exists...")
+        self.ensure_repo_exists()
         print("🔄 Uploading files to Hugging Face...")
 
         # Upload to Intermediate Files folder

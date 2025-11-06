@@ -92,8 +92,9 @@ class POIProcessor:
         ## Update
         df["year_month"] = df["UTC Time"].dt.to_period("M")
         latest_month = df.sort_values("UTC Time", ascending=False)["year_month"].iloc[0]
+        all_months = len(list(set(df["year_month"].values.tolist())))
         print("Latest month is:", latest_month)
-        df["Visit Recency"] = (latest_month - df["year_month"]).apply(lambda x: x.n if x.n<6 else 100)
+        df["Visit Recency"] = (latest_month - df["year_month"]).apply(lambda x: x.n if x.n<int(all_months*0.8) else 100)
         # 100 means no visit in latest 6 months, 0~5 means visits in latest x+1 months
         
         df["Timezone Offset"] = pd.to_numeric(df["Timezone Offset"], errors="coerce").astype("Int64")

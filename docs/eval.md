@@ -32,6 +32,13 @@ The following LLMs are trained with 64 effective batch size, 1e-5 learning rate,
 | new-llama3-tky-kl | Our KL | 0.2444 | 0.2691 | 0.3168 | 0.2308 |
 
 
+### Cross-Evaluation
+
+| Train Data\Test Data | NYC | TKY |
+|-------|-------|-------|
+| NYC | 0.3155 | 0.2455 |
+| TKY | 0.3118 | 0.2475 |
+
 ## Old RQVAE
 
 ### NYC

@@ -255,6 +255,12 @@ class LLMDatasetGenerator:
                 'rqvae-tky-div0.25-commit0.25-lr5e-5-without_L_quant',
                 'rqvae-tky-div0.5-commit0.25-lr5e-5',
                 'rqvae-tky-div0.75-commit0.25-lr5e-5'
+            ],
+            'NYC_Exploration': [
+                'Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3',
+            ],
+            'TKY_Exploration': [
+                'Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3',
             ]
         }
     
@@ -307,6 +313,8 @@ class LLMDatasetGenerator:
             'rqvae-tky-div0.25-commit0.25-lr5e-5',  # Old model
             'Nrqvae-NYC-div0.25-commit0.25-lr1e-3',  # New model
             'Nrqvae-TKY-div0.25-commit0.25-lr1e-3',  # New model
+            'Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3',  # Exploration model
+            'Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3',  # Exploration model
         ]
         if model_name in notime_models:
             for mode in modes:

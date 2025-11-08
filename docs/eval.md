@@ -16,6 +16,7 @@ The following LLMs are trained with 64 effective batch size, 1e-5 learning rate,
 | new-llama3-nyc-div-0.5 | Our div 0.5 | 0.2890 | 0.3309 | 0.3796 | 0.3039 |
 | new-llama3-nyc-div-0.75 | Our div 0.75  | 0.2963 | 0.3327 | 0.3803 | 0.3100 |
 | new-llama3-nyc-kl | Our KL | 0.2720 | 0.3234 | 0.4038 | 0.3074 |
+| new-llama3-nyc-exploration-base | Our exploration | 0.3305 | 0.3671 | 0.4754 | 0.3606 |
 
 
 ### TKY
@@ -30,7 +31,7 @@ The following LLMs are trained with 64 effective batch size, 1e-5 learning rate,
 | new-llama3-tky-div-0.5 | Our div 0.5 | 0.2465 | 0.2857 | 0.3567 | 0.2530 |
 | new-llama3-tky-div-0.75 | Our div 0.75  | 0.2434 | 0.2822 | 0.3571 | 0.2450 |
 | new-llama3-tky-kl | Our KL | 0.2444 | 0.2691 | 0.3168 | 0.2308 |
-
+| new-llama3-tky-exploration-base | Our exploration | 0.2728 | 0.3195 | 0.3413 | 0.2879 |
 
 ### Cross-Evaluation
 

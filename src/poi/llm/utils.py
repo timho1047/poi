@@ -1,7 +1,3 @@
-import gc
-import os
-
-import torch
 from peft import PeftModel
 
 from poi.llm.config import LLMConfig
@@ -120,61 +116,3 @@ print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 """
 
     return model_card
-
-
-def cleanup_memory(verbose: bool = True):
-    """
-    Comprehensive memory cleanup to avoid OOM errors between model training runs.
-
-    This function:
-    1. Forces Python garbage collection
-    2. Clears PyTorch CUDA cache
-    3. Synchronizes CUDA operations
-    4. Reports memory usage (on rank 0)
-
-    Args:
-        verbose: Whether to print memory cleanup information (default: True)
-    """
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    rank = int(os.environ.get("RANK", 0))
-
-    if verbose and rank == 0:
-        print("\n" + "=" * 50)
-        print("Starting memory cleanup...")
-        print("=" * 50)
-
-    # Force garbage collection
-    gc.collect()
-    gc.collect()  # Run twice for better cleanup
-    gc.collect()
-
-    # Clear CUDA cache if available
-    if torch.cuda.is_available():
-        # Synchronize first
-        torch.cuda.synchronize()
-
-        # Empty cache
-        torch.cuda.empty_cache()
-
-        # Reset memory stats
-        torch.cuda.reset_peak_memory_stats(local_rank)
-        torch.cuda.reset_accumulated_memory_stats(local_rank)
-
-        # IPC collect - helps with shared memory cleanup
-        torch.cuda.ipc_collect()
-
-        # Synchronize again
-        torch.cuda.synchronize()
-
-        # Print memory stats on rank 0
-        if verbose and rank == 0:
-            allocated = torch.cuda.memory_allocated(local_rank) / 1024**3
-            reserved = torch.cuda.memory_reserved(local_rank) / 1024**3
-
-            print(f"\nGPU {local_rank} Memory Stats After Cleanup:")
-            print(f"  Allocated: {allocated:.2f} GB")
-            print(f"  Reserved: {reserved:.2f} GB")
-
-    if verbose and rank == 0:
-        print("Memory cleanup complete.")
-        print("=" * 50 + "\n")

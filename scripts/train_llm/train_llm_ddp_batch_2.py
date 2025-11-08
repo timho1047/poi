@@ -9,32 +9,20 @@ from poi import settings
 from poi.llm.ddp_utils import CreateRunBatchItem, create_run_batch
 from poi.llm.trainer import train_llm_ddp_batch
 
-NYC_DS = settings.DATASETS_DIR / "NYC" / "New LLM Dataset"
-TKY_DS = settings.DATASETS_DIR / "TKY" / "New LLM Dataset"
+NYC_DS = settings.DATASETS_DIR / "NYC_Exploration" / "LLM Dataset"
+TKY_DS = settings.DATASETS_DIR / "TKY_Exploration" / "LLM Dataset"
 
 ########################################################
 ### List of runs to train
 ########################################################
 RUN_ITEMS: list[CreateRunBatchItem] = [
     CreateRunBatchItem(
-        run_name="new-llama3-tky-no-div",
-        dataset_dir=TKY_DS / "Nrqvae-TKY-div0.00-commit0.25-lr1e-3",
+        run_name="new-llama3-nyc-exploration-base",
+        dataset_dir=NYC_DS / "Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3",
     ),
     CreateRunBatchItem(
-        run_name="new-llama3-tky-no-quant",
-        dataset_dir=TKY_DS / "Nrqvae-without_L_quant-TKY-div0.25-commit0.25-lr1e-3",
-    ),
-    CreateRunBatchItem(
-        run_name="new-llama3-tky-div-0.5",
-        dataset_dir=TKY_DS / "Nrqvae-TKY-div0.50-commit0.25-lr1e-3",
-    ),
-    CreateRunBatchItem(
-        run_name="new-llama3-tky-div-0.75",
-        dataset_dir=TKY_DS / "Nrqvae-TKY-div0.75-commit0.25-lr1e-3",
-    ),
-    CreateRunBatchItem(
-        run_name="new-llama3-tky-kl",
-        dataset_dir=TKY_DS / "Nrqvae-withKL-TKY-div0.25-commit0.25-lr1e-3",
+        run_name="new-llama3-tky-exploration-base",
+        dataset_dir=TKY_DS / "Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3",
     ),
 ]
 

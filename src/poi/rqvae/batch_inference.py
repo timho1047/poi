@@ -38,9 +38,15 @@ class ModelConfigParser:
         model_name = model_id.split('/')[-1]
         
         # Extract dataset name
-        if 'nyc' in model_name.lower():
+        lower_name = model_name.lower()
+        
+        if 'nyc_exploration' in lower_name:
+            dataset_name = 'NYC_Exploration'
+        elif 'tky_exploration' in lower_name:
+            dataset_name = 'TKY_Exploration'
+        elif 'nyc' in lower_name:
             dataset_name = 'NYC'
-        elif 'tky' in model_name.lower():
+        elif 'tky' in lower_name:
             dataset_name = 'TKY'
         else:
             raise ValueError(f"Cannot determine dataset from model name: {model_name}")
@@ -61,7 +67,6 @@ class ModelConfigParser:
             lr = 5e-5
         
         # Check for special flags
-        lower_name = model_name.lower()
         quant_weight = 0.0 if 'without_l_quant' in lower_name else 1.0
         # New variants: without reconstruction term, or using KL
         recon_weight = 0.0 if 'without_l_reconstruction' in lower_name else 1.0
@@ -206,7 +211,9 @@ class BatchInferenceManager:
             "comp5331poi/rqvae-nyc-div0.25-commit0.5-lr5e-5",
             "comp5331poi/rqvae-nyc-div0.0-commit0.5-lr5e-5",
             "comp5331poi/rqvae-nyc-div0.25-commit0.5-lr5e-5-without_L_quant",
-            "comp5331poi/rqvae-tky-div0.25-commit0.25-lr5e-5-without_L_quant"
+            "comp5331poi/rqvae-tky-div0.25-commit0.25-lr5e-5-without_L_quant",
+            "comp5331poi/Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3",
+            "comp5331poi/Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3",
         ]
     
     def process_models(self, model_list: Optional[List[str]] = None) -> None:

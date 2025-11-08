@@ -50,4 +50,4 @@ if __name__ == "__main__":
         (LLMConfig(run_name="llama3-nyc-test-no-sid"), NYC_PAPER_NO_SID_DS),
         (LLMConfig(run_name="llama3-nyc-test"), NYC_PAPER_BASE_DS),
     ]
-    evaluate_all_and_save(CONFIG_DS_DIR_PAIRS, settings.OUTPUT_DIR / "llm_metrics.csv")
+    evaluate_all_and_save(CONFIG_DS_DIR_PAIRS, settings.OUTPUT_DIR / "llm_metrics_test_filtered.csv")

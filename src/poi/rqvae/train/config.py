@@ -1,4 +1,6 @@
 import json
+import importlib
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -9,7 +11,7 @@ from ... import settings
 @dataclass
 class RQVAEConfig:
     # Training parameters
-    dataset_name: Literal["NYC", "TKY"] = "TKY"
+    dataset_name: str = "TKY"
     batch_size: int = 128
     epoch_num: int = 3000
     diversity_start_epoch: int = 1000
@@ -21,7 +23,6 @@ class RQVAEConfig:
 
     # Model parameters
     codebook_num: int = 3
-    vector_num: int = 64
     vector_dim: int = 64
     vae_hidden_dims: list[int] = field(default_factory=lambda: [128, 256, 512])
 
@@ -49,7 +50,16 @@ class RQVAEConfig:
 
     def __post_init__(self):
         self.dataset_path = settings.DATASETS_DIR / self.dataset_name / "RQVAE Dataset"
-        self.metadata = json.loads((self.dataset_path / "metadata.json").read_text())
+        self._ensure_local_dataset()
+
+        metadata_path = self.dataset_path / "metadata.json"
+        if not metadata_path.exists():
+            raise FileNotFoundError(
+                f"metadata.json not found for dataset {self.dataset_name}. "
+                "Please ensure the dataset is prepared locally or available on Hugging Face."
+            )
+
+        self.metadata = json.loads(metadata_path.read_text())
         self.embedding_dim = self.metadata["total_dim"]
         self.log_dir = settings.OUTPUT_DIR / "logs" / "rqvae" / self.run_name
         self.checkpoint_dir = (
@@ -62,9 +72,13 @@ class RQVAEConfig:
         self.model_card_path = self.checkpoint_dir / "README.md"
 
         # According to the paper:
-        # - NYC: 3 layers × 32 codewords × 64 dims
-        # - TKY/GWL: 3 layers × 64 codewords × 64 dims
-        self.vector_num = 32 if self.dataset_name == "NYC" else 64
+        # - NYC variants: 3 layers × 32 codewords × 64 dims
+        # - TKY/GWL variants: 3 layers × 64 codewords × 64 dims
+        dataset_name_lower = self.dataset_name.lower()
+        if "nyc" in dataset_name_lower:
+            self.vector_num = 32
+        else:
+            self.vector_num = 64
         
         self.loss_weights = {
             "reconstruction": self.recon_weight,
@@ -80,3 +94,56 @@ class RQVAEConfig:
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    def _ensure_local_dataset(self) -> None:
+        """
+        Ensure required dataset artifacts are available locally.
+        If they are missing, download them from the Hugging Face dataset repository.
+        """
+        dataset_root = settings.DATASETS_DIR / self.dataset_name
+        rqvae_dir = dataset_root / "RQVAE Dataset"
+        intermediate_dir = dataset_root / "Intermediate Files"
+
+        required_files = {
+            rqvae_dir / "metadata.json": "RQVAE Dataset/metadata.json",
+            rqvae_dir / "poi_features.pt": "RQVAE Dataset/poi_features.pt",
+            intermediate_dir / "pid_mapping.csv": "Intermediate Files/pid_mapping.csv",
+        }
+
+        missing_files = [dest for dest in required_files if not dest.exists()]
+        if not missing_files:
+            return
+
+        if not settings.HF_TOKEN:
+            missing = ", ".join(str(path) for path in missing_files)
+            raise RuntimeError(
+                f"Required dataset files are missing ({missing}) and HF_TOKEN is not set "
+                "to download them automatically."
+            )
+
+        try:
+            snapshot_download = getattr(importlib.import_module("huggingface_hub"), "snapshot_download")
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "huggingface_hub is required to download datasets automatically. "
+                "Please install it or ensure dataset files exist locally."
+            ) from exc
+
+        snapshot_dir = Path(
+            snapshot_download(
+                repo_id=f"{settings.HF_ORG}/{self.dataset_name.lower()}",
+                repo_type="dataset",
+                token=settings.HF_TOKEN,
+                allow_patterns=list(required_files.values()),
+            )
+        )
+
+        for dest_path, rel_path in required_files.items():
+            src_path = snapshot_dir / rel_path
+            if not src_path.exists():
+                raise FileNotFoundError(
+                    f"Expected file '{rel_path}' not found in Hugging Face dataset "
+                    f"{settings.HF_ORG}/{self.dataset_name}."
+                )
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_path, dest_path)

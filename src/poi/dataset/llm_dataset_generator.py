@@ -31,13 +31,14 @@ from poi.settings import HF_ORG
 class DataDownloader:
     """Handles downloading of codebook and data files from Hugging Face."""
     
-    def __init__(self, hf_token: str):
+    def __init__(self, hf_token: str, base_folder: str | None = None):
         self.hf_token = hf_token
+        self.base_folder = base_folder or os.getenv("HF_LLM_DATASET_DIR", "LLM Dataset")
     
     def download_codebook_file(self, dataset_name: str, model_name: str, temp_dir: str) -> str:
         """Download codebook file from Hugging Face."""
         filename = f"codebooks-{model_name}.csv"
-        hf_path = f"LLM Dataset/Intermediate Files/{filename}"
+        hf_path = f"{self.base_folder}/Intermediate Files/{filename}"
         
         # Use snapshot_download method
         local_dir = snapshot_download(
@@ -177,8 +178,9 @@ class JSONGenerator:
 class HFUploader:
     """Handles file uploads to Hugging Face with retry mechanisms."""
     
-    def __init__(self, hf_token: str):
+    def __init__(self, hf_token: str, base_folder: str | None = None):
         self.hf_token = hf_token
+        self.base_folder = base_folder or os.getenv("HF_LLM_DATASET_DIR", "LLM Dataset")
         self.max_retries = 3
     
     def upload_json_to_hf(self, json_data: str, filename: str, dataset_name: str, model_name: str) -> None:
@@ -189,7 +191,7 @@ class HFUploader:
             tmp_file_path = tmp_file.name
         
         # Upload to HF with retry mechanism
-        hf_path = f"LLM Dataset/{model_name}/{filename}"
+        hf_path = f"{self.base_folder}/{model_name}/{filename}"
         self._upload_with_retry(tmp_file_path, hf_path, dataset_name)
         
         # Clean up temporary file
@@ -197,12 +199,12 @@ class HFUploader:
     
     def upload_json_to_hf_notime(self, json_data: str, filename: str, dataset_name: str) -> None:
         """Upload notime JSON file to LLM Dataset/ablation without Time folder."""
-        hf_path = f"LLM Dataset/ablation without Time/{filename}"
+        hf_path = f"{self.base_folder}/ablation without Time/{filename}"
         self._upload_with_retry(json_data.encode('utf-8'), hf_path, dataset_name)
     
     def upload_json_to_hf_id(self, json_data: str, filename: str, dataset_name: str) -> None:
         """Upload ID JSON file to LLM Dataset/ablation without SID folder."""
-        hf_path = f"LLM Dataset/ablation without SID/{filename}"
+        hf_path = f"{self.base_folder}/ablation without SID/{filename}"
         self._upload_with_retry(json_data.encode('utf-8'), hf_path, dataset_name)
     
     def _upload_with_retry(self, data, hf_path: str, dataset_name: str) -> None:
@@ -231,11 +233,12 @@ class HFUploader:
 class LLMDatasetGenerator:
     """Main orchestrator class for generating LLM datasets."""
     
-    def __init__(self, hf_token: str):
+    def __init__(self, hf_token: str, base_folder: str | None = None):
         self.hf_token = hf_token
-        self.downloader = DataDownloader(hf_token)
+        self.base_folder = base_folder or os.getenv("HF_LLM_DATASET_DIR", "LLM Dataset")
+        self.downloader = DataDownloader(hf_token, base_folder=self.base_folder)
         self.json_generator = JSONGenerator()
-        self.uploader = HFUploader(hf_token)
+        self.uploader = HFUploader(hf_token, base_folder=self.base_folder)
         
         # Define all models
         self.models = {
@@ -252,6 +255,12 @@ class LLMDatasetGenerator:
                 'rqvae-tky-div0.25-commit0.25-lr5e-5-without_L_quant',
                 'rqvae-tky-div0.5-commit0.25-lr5e-5',
                 'rqvae-tky-div0.75-commit0.25-lr5e-5'
+            ],
+            'NYC_Exploration': [
+                'Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3',
+            ],
+            'TKY_Exploration': [
+                'Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3',
             ]
         }
     
@@ -298,7 +307,16 @@ class LLMDatasetGenerator:
             self.uploader.upload_json_to_hf(json_data, filename, dataset_name, model_name)
         
         # Only specific models generate notime files
-        if model_name in ['rqvae-nyc-div0.25-commit0.5-lr5e-5', 'rqvae-tky-div0.25-commit0.25-lr5e-5']:
+        # Support both old rqvae and new Nrqvae model names
+        notime_models = [
+            'rqvae-nyc-div0.25-commit0.5-lr5e-5',  # Old model
+            'rqvae-tky-div0.25-commit0.25-lr5e-5',  # Old model
+            'Nrqvae-NYC-div0.25-commit0.25-lr1e-3',  # New model
+            'Nrqvae-TKY-div0.25-commit0.25-lr1e-3',  # New model
+            'Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3',  # Exploration model
+            'Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3',  # Exploration model
+        ]
+        if model_name in notime_models:
             for mode in modes:
                 json_data, filename = self.json_generator.generate_json(
                     mode, dataset_name, codebook_path, data_dir, 

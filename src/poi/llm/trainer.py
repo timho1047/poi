@@ -1,9 +1,9 @@
-import os
+import json
+import subprocess
+import tempfile
 import time
 import warnings
-from contextlib import contextmanager
 from pathlib import Path
-from typing import TypedDict
 
 import torch
 from huggingface_hub import create_repo, repo_exists, upload_file, upload_folder
@@ -20,7 +20,8 @@ from datasets import Dataset
 from .. import settings
 from ..dataset.llm import load_tokenized_llm_dataset
 from ..llm import LLMConfig
-from .utils import cleanup_memory, generate_model_card, print_trainable_parameters, print_training_configuration
+from ..llm.ddp_utils import TrainLLMRun, ddp_context, serialize_run
+from .utils import generate_model_card, print_trainable_parameters, print_training_configuration
 
 # Suppress harmless warnings
 warnings.filterwarnings("ignore", message=".*use_reentrant parameter.*")
@@ -182,31 +183,8 @@ def train_full_llm_fast(config: LLMConfig, train_dataset: Dataset, eval_dataset:
     return trainer, model, tokenizer
 
 
-@contextmanager
-def ddp_context():
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    rank = int(os.environ.get("RANK", 0))
-    world_size = int(os.environ.get("WORLD_SIZE", 1))
-    is_dist = world_size > 1
-
-    # Initialize DDP
-    if is_dist:
-        if not torch.distributed.is_initialized():
-            torch.distributed.init_process_group(backend="nccl", init_method="env://")
-        torch.cuda.set_device(local_rank)
-    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
-
-    print(f"RANK={rank} LOCAL_RANK={local_rank} WORLD_SIZE={world_size} device={device}")
-
-    yield local_rank, rank, world_size
-
-    # Graceful DDP cleanup
-    if is_dist and torch.distributed.is_initialized():
-        torch.distributed.barrier()
-        torch.distributed.destroy_process_group()
-
-
 def train_llm_fast_ddp(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):
+    """An simple implementation of DDP training for unsloth. Only works for training one model."""
     # Attribution: https://github.com/unslothai/unsloth/issues/2435#issuecomment-3436555056
 
     # Wrap the training in a DDP context, will fallback to single GPU training if not using DDP
@@ -216,124 +194,116 @@ def train_llm_fast_ddp(config: LLMConfig, train_dataset: Dataset, eval_dataset: 
     return trainer, model, tokenizer
 
 
-class TrainLLMRun(TypedDict):
-    config: LLMConfig
-    train_dataset_path: Path
-    eval_dataset_path: Path | None
-    max_examples: int | None
-    push_to_hub: bool
-    force_push: bool
+def train_llm_ddp_single_run(run: TrainLLMRun):
+    """A single run of training a LLM model in DDP."""
 
-
-def train_llm_fast_ddp_batch(runs: list[TrainLLMRun]):
     with ddp_context() as (_, rank, world_size):
         if rank == 0:
-            global_start_time = time.time()
-            if any(run["push_to_hub"] for run in runs):
+            start_time = time.time()
+            print(f"\n{'=' * 70}")
+            print(f"Training: {run['config'].run_name}")
+            print(f"{'=' * 70}\n")
+            if run["push_to_hub"]:
                 assert settings.HF_TOKEN is not None, "HF_TOKEN is not set"
 
-        for idx, run in enumerate(runs, 1):
+        train_dataset = None
+        eval_dataset = None
+
+        try:
+            # Load the datasets on each rank on by one to avoid deadlock
+            for i in range(world_size):
+                if i == rank:
+                    train_dataset = load_tokenized_llm_dataset(run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"])
+                    if run["eval_dataset_path"]:
+                        eval_dataset = load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
+                if world_size > 1 and torch.distributed.is_initialized():
+                    torch.distributed.barrier()
+
+            should_skip = False
+            if rank == 0:
+                should_skip = not run["force_push"] and repo_exists(run["config"].hub_id)
+
+            if world_size > 1 and torch.distributed.is_initialized():
+                should_skip_tensor = torch.tensor([should_skip], dtype=torch.bool, device=f"cuda:{rank}")
+                torch.distributed.broadcast(should_skip_tensor, src=0)
+                should_skip = should_skip_tensor.item()
+
+            if should_skip:
+                if rank == 0:
+                    print(f"\n{'=' * 70}")
+                    print(f"Repo {run['config'].hub_id} already exists, skipping...")
+                    print(f"{'=' * 70}\n")
+            else:
+                train_llm_fast(run["config"], train_dataset, eval_dataset, run["push_to_hub"], rank=rank)
+
+        except Exception as e:
             if rank == 0:
                 print(f"\n{'=' * 70}")
-                local_start_time = time.time()
-                print(f"Training: {run['config'].run_name}")
+                print(f"Error training {run['config'].run_name}")
+                print(f"{'=' * 70}\n")
+                print(f"Error: {str(e)}")
+
+            if world_size > 1 and torch.distributed.is_initialized():
+                torch.distributed.barrier()
+
+            raise
+
+        finally:
+            if rank == 0:
+                print(f"\n{'=' * 70}")
+                print(f"Completed: {run['config'].run_name}")
+                print(f"Time taken: {(time.time() - start_time) / 3600:.2f} hours")
                 print(f"{'=' * 70}\n")
 
-            train_dataset = None
-            eval_dataset = None
-            trainer = None
-            model = None
-            tokenizer = None
-            try:
-                for i in range(world_size):
-                    if i == rank:
-                        train_dataset = load_tokenized_llm_dataset(run["train_dataset_path"], config=run["config"], max_examples=run["max_examples"])
-                        eval_dataset = (
-                            load_tokenized_llm_dataset(run["eval_dataset_path"], config=run["config"], max_examples=run["max_examples"])
-                            if run["eval_dataset_path"] is not None
-                            else None
-                        )
-                    if world_size > 1 and torch.distributed.is_initialized():
-                        torch.distributed.barrier()
 
-                # Only rank 0 checks if repo exists, then broadcasts decision to all ranks
-                should_skip = False
-                if rank == 0:
-                    should_skip = not run["force_push"] and repo_exists(run["config"].hub_id)
+def train_llm_ddp_batch(runs: list[TrainLLMRun], script_path: Path, nproc_per_node: int = 8):
+    """
+    Train a batch of LLM models in DDP. Using subprocess to run the training script to avoid deadlocks and memory cleaning.
+    """
 
-                # Broadcast the skip decision from rank 0 to all other ranks
-                if world_size > 1 and torch.distributed.is_initialized():
-                    should_skip_tensor = torch.tensor([should_skip], dtype=torch.bool, device=f"cuda:{rank}")
-                    torch.distributed.broadcast(should_skip_tensor, src=0)
-                    should_skip = should_skip_tensor.item()
+    if not script_path.exists():
+        raise FileNotFoundError(f"Script path {script_path.absolute().as_posix()} does not exist")
 
-                if should_skip:
-                    if rank == 0:
-                        print(f"\n{'=' * 70}")
-                        print(f"Repo {run['config'].hub_id} already exists, skipping...")
-                        print(f"{'=' * 70}\n")
-                else:
-                    trainer, model, tokenizer = train_llm_fast(run["config"], train_dataset, eval_dataset, run["push_to_hub"], rank=rank)
+    global_start_time = time.time()
 
-            except Exception as e:
-                if rank == 0:
-                    print(f"\n{'=' * 70}")
-                    print(f"Error training {run['config'].run_name}, skipping...")
-                    print(f"{'=' * 70}\n")
-                    print(f"Error: {str(e)}")
+    for idx, run in enumerate(runs, 1):
+        print(f"\n{'=' * 70}")
+        print(f"Starting run {idx}/{len(runs)}: {run['config'].run_name}")
+        print(f"{'=' * 70}\n")
 
-                # Synchronize all ranks after exception to prevent hanging
-                if world_size > 1 and torch.distributed.is_initialized():
-                    torch.distributed.barrier()
+        local_start_time = time.time()
 
-            finally:
-                # 1. Delete optimizer state from trainer
-                if trainer is not None:
-                    if hasattr(trainer, "optimizer") and trainer.optimizer is not None:
-                        del trainer.optimizer
-                    if hasattr(trainer, "lr_scheduler") and trainer.lr_scheduler is not None:
-                        del trainer.lr_scheduler
-                    # Remove model reference from trainer
-                    if hasattr(trainer, "model"):
-                        trainer.model = None
-                    del trainer
+        # Use temporary file to avoid generating too many files in the current directory
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            config_path = f.name
+            json.dump(serialize_run(run), f)
 
-                # 2. Delete model (largest memory consumer)
-                if model is not None:
-                    # Move model to CPU first to free GPU memory
-                    if hasattr(model, "cpu"):
-                        model.cpu()
-                    del model
+        try:
+            result = subprocess.run(
+                ["torchrun", f"--nproc_per_node={nproc_per_node}", script_path.absolute().as_posix(), "--config", config_path], check=False
+            )
 
-                # 3. Delete tokenizer
-                if tokenizer is not None:
-                    del tokenizer
+            if result.returncode == 0:
+                print(f"\n{'=' * 70}")
+                print(f"Successfully completed: {run['config'].run_name}")
+                print(f"Time taken: {(time.time() - local_start_time) / 3600:.2f} hours")
+                print(f"{'=' * 70}\n")
+            else:
+                print(f"\n{'=' * 70}")
+                print(f"Failed: {run['config'].run_name} (exit code: {result.returncode})")
+                print(f"Time taken: {(time.time() - local_start_time) / 3600:.2f} hours")
+                print("Continuing with next run...")
+                print(f"{'=' * 70}\n")
 
-                # 4. Delete datasets
-                if eval_dataset is not None:
-                    del eval_dataset
-                if train_dataset is not None:
-                    del train_dataset
+        finally:
+            # Clean up the temporary file
+            Path(config_path).unlink(missing_ok=True)
 
-                # 5. Synchronize before cleanup to ensure all ranks are done
-                if world_size > 1 and torch.distributed.is_initialized():
-                    torch.distributed.barrier()
+    print(f"\n{'=' * 70}")
+    print("All runs completed!")
+    print(f"Total time: {(time.time() - global_start_time) / 3600:.2f} hours")
+    print(f"{'=' * 70}\n")
 
-                # 6. Clean up memory
-                cleanup_memory()
-
-                if rank == 0:
-                    print(f"\n{'=' * 70}")
-                    print(f"Completed: {run['config'].run_name}")
-                    print(f"Time taken for this run: {(time.time() - local_start_time) / 3600:.2f} hours")
-                    print(f"Time taken for all runs: {(time.time() - global_start_time) / 3600:.2f} hours")
-                    print(f"Completed {idx}/{len(runs)} runs")
-                    print(f"{'=' * 70}\n")
-
-        if rank == 0:
-            print(f"\n{'=' * 70}")
-            print(f"All runs completed in {(time.time() - global_start_time) / 3600:.2f} hours!")
-            print(f"{'=' * 70}\n")
 
 
 def train_llm(config: LLMConfig, train_dataset: Dataset, eval_dataset: Dataset, push_to_hub: bool = False):

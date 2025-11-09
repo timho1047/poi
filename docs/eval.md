@@ -1,4 +1,4 @@
-The following LLMs are trained with 64 effective batch size, 1e-5 learning rate, 8 epochs with early stopping, lora rank 16, lora alpha 32, lora dropout 0.1, 4-bit quantization if not specified.
+The following LLMs are trained with 64 effective batch size, 1e-5 learning rate, 8 epochs with early stopping, lora rank 16, lora alpha 32, lora dropout 0.1, 4-bit quantization if not specified. The test models are trained using the processed dataset from the original paper. `Test Accuracy` is the main column we care about.
 
 ## New RQVAE
 
@@ -8,6 +8,7 @@ The following LLMs are trained with 64 effective batch size, 1e-5 learning rate,
 |-------|-------|-------|-------|-------|-------|
 | llama3-nyc-test | Paper Base |  - | - | 0.3711 | 0.3368 |
 | llama3-nyc-test-no-sid | Paper Base w/o sid | - | - | 0.3933 | 0.3204 |
+| llama3-nyc-test-full-fintune | Paper Base (Unquantized) | - | - | 0.3743 | 0.3276 | 
 | new-llama3-nyc-base | Our Base | 0.2963 | 0.3271 | 0.3869 | 0.3155 |
 | new-llama3-nyc-no-quant | Our Ablation w/o L_quant | 0.2902 | 0.3429 | 0.4080 | 0.3161 |
 | new-llama3-nyc-no-div | Our Ablation w/o L_div | 0.2939 | 0.3318 | 0.4129 | 0.3100 |

@@ -1,4 +1,4 @@
-This repo is for the implementation project of COMP5331, 2025 Fall. The original paper is **Generative Next POI Recommendation with Semantic ID**.
+This repo is for the implementation project of COMP5331, 2025 Fall. The original paper is **Generative Next POI Recommendation with Semantic ID**. All trained RQ-VAE models and finetuned LLaMA3-8B model lora are available on Hugging Face organization [comp5331poi](https://huggingface.co/comp5331poi).
 
 ## Evaluation Results
 
@@ -80,19 +80,62 @@ uv run scripts/dataset/download_all.py
 - `datasets`: All datasets of the project.
 
 
-## Excute
-Here are some main scripts for training, inference and evaluation.
+## Execution
+All execution scripts are under `scripts` directory. Here are some main scripts for training, inference and evaluation.
 
 
 ### Training
+To train a RQ-VAE model with specified configuration (see `scripts/rqvae/train_rqvae.py`), run:
+
 ```bash
-uv run scripts/llm/train_llm.py
+uv run scripts/rqvae/train_rqvae.py
+```
+
+To train the LLMs in batch with specified configuration (see `scripts/llm/train_llm_ddp_batch.py`), using 8 GPUs, run:
+```bash
+source .venv/bin/activate
+python python scripts/llm/train_llm_ddp_batch.py
 ```
 
 ### Inference
+Example inference script for RQ-VAE model:
+```bash
+uv run scripts/rqvae/inference_rqvae.py
+```
+
+Example inference script for LLM model:
 ```bash
 uv run scripts/llm/inference_llm.py
 ```
+Models will be downloaded from Hugging Face automatically.
+
+### Evaluation
+To evaluate all models in batch with specified configuration (see `scripts/evaluate/evaluate_all_llm.py`), run:
+```bash
+uv run scripts/evaluate/evaluate_all_llm.py
+```
+Models will be downloaded from Hugging Face automatically.
+
+### Visualization
+Below are scripts to generate visualizations for anaylysis.
+
+- `scripts/evaluate/visualization/unique_collision_calculation.py`  
+  ```bash
+  uv run scripts/evaluate/visualization/unique_collision_calculation.py --local-file path/to/codebook.csv
+  ```
+  Omitting `--local-file` will download the predefined Hugging Face datasets listed in the script.
+
+- `scripts/evaluate/visualization/test.ipynb`  
+  Open in Jupyter / VS Code and run top-to-bottom. The first cell downloads the NYC data; adjust `target_path` or `model_name` if needed.
+
+- `scripts/evaluate/visualization/test_cat_region.ipynb`  
+  Same workflow as `test.ipynb`, but focused on category/region analysis. Run each cell sequentially after the data download cell finishes.
+
+- `scripts/evaluate/visualization/test_region.ipynb`  
+  Notebook for SID prefix vs. region visualizations. Update `target_path`/`model_name` if you want another dataset, then run cells in order.
+
+
+
 
 ## Development Guidelines
 
@@ -153,49 +196,7 @@ train_rqvae(config)
 ```
 
 ### API
-1. See `scripts/inference_rqvae_example.py` for the API of encoding POI sids.
-2. See `scripts/inference_llm.py` for the API of LLM inference.
-3. See `scripts/train_llm/train_llm.py` for the API of training LLM.
-4. See `scripts/train_rqvae.py` for the API of training RQVAE.
-
-### Dataset format
-All datasets should be placed under `datasets` directory in the following format (tentative):
-```
-datasets/
-├── NYC/
-│   ├── train_codebook.json
-│   ├── test_codebook.json
-│   ├── poi_features.pt
-│   ├── metadata.json
-├── TKY/
-│   ├── train_codebook.json
-│   ├── test_codebook.json
-│   ├── poi_features.pt
-│   ├── metadata.json
-├── GWL/
-│   ├── train_codebook.json
-│   ├── test_codebook.json
-│   ├── poi_features.pt
-│   ├── metadata.json
-```
-
-
-## Visualization & Metrics Scripts
-
-- `scripts/evaluate/visualization/unique_collision_calculation.py`  
-  ```bash
-  uv run scripts/evaluate/visualization/unique_collision_calculation.py --local-file path/to/codebook.csv
-  ```
-  Omitting `--local-file` will download the predefined Hugging Face datasets listed in the script.
-
-- `scripts/evaluate/visualization/test.ipynb`  
-  Open in Jupyter / VS Code and run top-to-bottom. The first cell downloads the NYC data; adjust `target_path` or `model_name` if needed.
-
-- `scripts/evaluate/visualization/test_cat_region.ipynb`  
-  Same workflow as `test.ipynb`, but focused on category/region analysis. Run each cell sequentially after the data download cell finishes.
-
-- `scripts/evaluate/visualization/test_region.ipynb`  
-  Notebook for SID prefix vs. region visualizations. Update `target_path`/`model_name` if you want another dataset, then run cells in order.
-  
-### Dataset
-All datasets should be placed under `datasets` directory. We can download the datasets from Hugging Face by `uv run scripts/download_datasets.py`.
+1. See `scripts/rqvae/inference_rqvae.py` for the API of encoding POI sids.
+2. See `scripts/llm/inference_llm.py` for the API of LLM inference.
+3. See `scripts/llm/train_llm_ddp_batch.py` for the API of training LLM.
+4. See `scripts/rqvae/train_rqvae.py` for the API of training RQVAE.

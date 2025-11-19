@@ -22,7 +22,7 @@ def main():
         print("🔑 Using provided token...")
     else:
         print("⚠️  No token provided. Please provide your HF token as an argument:")
-        print("   python scripts/prepare_rqvae_data_explore.py YOUR_TOKEN_HERE")
+        print("   python scripts/dataset/prepare_rqvae_data_explore.py YOUR_TOKEN_HERE")
         print("   Or set HF_TOKEN environment variable")
         return
 

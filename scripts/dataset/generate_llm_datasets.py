@@ -10,10 +10,10 @@ USAGE:
    export HF_TOKEN="your_huggingface_token_here"
 
 2. Run the script:
-   uv run scripts/generate_llm_datasets.py
+   uv run scripts/dataset/generate_llm_datasets.py
 
 3. Or run directly with token:
-   HF_TOKEN="your_token" uv run scripts/generate_llm_datasets.py
+   HF_TOKEN="your_token" uv run scripts/dataset/generate_llm_datasets.py
 
 FUNCTIONALITY:
 - Downloads 10 codebook CSV files from HF

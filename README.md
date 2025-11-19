@@ -1,3 +1,5 @@
+This repo is for the implementation project of COMP5331, 2025 Fall. The original paper is **Generative Next POI Recommendation with Semantic ID**. All trained RQ-VAE models and finetuned LLaMA3-8B model lora are available on Hugging Face organization [comp5331poi](https://huggingface.co/comp5331poi).
+
 ## Evaluation Results
 
 The following LLMs are trained with 64 effective batch size, 1e-5 learning rate, 8 epochs with early stopping, lora rank 16, lora alpha 32, lora dropout 0.1, 4-bit quantization if not specified. The test models are trained using the processed dataset from the original paper. `Test Accuracy` is the main column we care about.
@@ -46,63 +48,94 @@ Using base models.
 
 ## Setup
 
-### Manage Dependencies and run scripts
-
-This repo use `uv` as package manager. `uv` is a tool that helps you manage the dependencies of your project, written in `rust`. It is much faster than `pip`, and use standard `pyproject.toml` file to manage the project (rather than `requirements.txt`). 
-
-`uv` is installed in this cloud instance already.
-
-To install the dependencies, run:
-
-```bash
-uv sync
-```
-
-To add a new dependency, run:
-```bash
-uv add <dependency>
-```
-
-To remove a dependency, run:
-```bash
-uv remove <dependency>
-```
-
-To run a python script, run:
-```bash
-uv run path/to/your/script.py
-```
-
-If you want to run a script using the local python manually without using `uv`, you can activate the virtual environment:
-```bash
-source .venv/bin/activate  # activate the virtual environment, 
-                           # you should see (poi) in the beginning 
-                           # of the prompt.
-
-python path/to/your/script.py
-```
-
-
-All dependencies listed in `pyproject.toml` will be installed in `.venv` (the virtual environment) directory.
-
-### Local Machine
-
-If you are using local machine, you can install `uv` via `pip` by running:
+This project use `uv` as package manager. You can install `uv` via `pip` by running:
 ```bash
 pip install uv
 ```
 
-Then you can use `uv` command to manage the dependencies as mentioned above.
-
-### Check GPU Utilization
-
-To check the GPU utilization (cuda), you can use the following command:
+If `uv` is installed, you can use `uv` command to install the dependencies.
 ```bash
-nvidia-smi # will show the GPU utilization of all GPUs
-nvidia-smi -l 1 # will show the GPU utilization of all GPUs every 1 second
-
-nvtop # will show the GPU utilization in a prettier way, which can be exited by pressing `q`
+uv sync
 ```
+
+You can download all datasets to `datasets` directory by running:
+
+```bash
+uv run scripts/dataset/download_all.py
+```
+
+
+## Project structure
+
+- `src/poi`: The core library of the project.
+  - `src/poi/dataset`: Dataset processing and preparation.
+  - `src/poi/llm`: LLM training and inference.
+  - `src/poi/rqvae`: RQVAE model, training and inference.
+    - `src/poi/rqvae/model`: The core model of RQVAE.
+    - `src/poi/rqvae/train`: The training code of RQVAE.
+  - `src/poi/settings`: All global settings of the project.
+
+- `scripts`: All scripts of the project for performing tasks, including dataset downloading, LLM training, RQVAE training, etc.
+- `output`: All output files of the project, including model checkpoints and training logs.
+- `datasets`: All datasets of the project.
+
+
+## Execution
+All execution scripts are under `scripts` directory. Here are some main scripts for training, inference and evaluation.
+
+
+### Training
+To train a RQ-VAE model with specified configuration (see `scripts/rqvae/train_rqvae.py`), run:
+
+```bash
+uv run scripts/rqvae/train_rqvae.py
+```
+
+To train the LLMs in batch with specified configuration (see `scripts/llm/train_llm_ddp_batch.py`), using 8 GPUs, run:
+```bash
+source .venv/bin/activate
+python python scripts/llm/train_llm_ddp_batch.py
+```
+
+### Inference
+Example inference script for RQ-VAE model:
+```bash
+uv run scripts/rqvae/inference_rqvae.py
+```
+
+Example inference script for LLM model:
+```bash
+uv run scripts/llm/inference_llm.py
+```
+Models will be downloaded from Hugging Face automatically.
+
+### Evaluation
+To evaluate all models in batch with specified configuration (see `scripts/evaluate/evaluate_all_llm.py`), run:
+```bash
+uv run scripts/evaluate/evaluate_all_llm.py
+```
+Models will be downloaded from Hugging Face automatically.
+
+### Visualization
+Below are scripts to generate visualizations for anaylysis.
+
+- `scripts/evaluate/visualization/unique_collision_calculation.py`  
+  ```bash
+  uv run scripts/evaluate/visualization/unique_collision_calculation.py --local-file path/to/codebook.csv
+  ```
+  Omitting `--local-file` will download the predefined Hugging Face datasets listed in the script.
+
+- `scripts/evaluate/visualization/test.ipynb`  
+  Open in Jupyter / VS Code and run top-to-bottom. The first cell downloads the NYC data; adjust `target_path` or `model_name` if needed.
+
+- `scripts/evaluate/visualization/test_cat_region.ipynb`  
+  Same workflow as `test.ipynb`, but focused on category/region analysis. Run each cell sequentially after the data download cell finishes.
+
+- `scripts/evaluate/visualization/test_region.ipynb`  
+  Notebook for SID prefix vs. region visualizations. Update `target_path`/`model_name` if you want another dataset, then run cells in order.
+
+
+
 
 ## Development Guidelines
 
@@ -163,49 +196,7 @@ train_rqvae(config)
 ```
 
 ### API
-1. See `scripts/inference_rqvae_example.py` for the API of encoding POI sids.
-2. See `scripts/inference_llm.py` for the API of LLM inference.
-3. See `scripts/train_llm/train_llm.py` for the API of training LLM.
-4. See `scripts/train_rqvae.py` for the API of training RQVAE.
-
-### Dataset format
-All datasets should be placed under `datasets` directory in the following format (tentative):
-```
-datasets/
-├── NYC/
-│   ├── train_codebook.json
-│   ├── test_codebook.json
-│   ├── poi_features.pt
-│   ├── metadata.json
-├── TKY/
-│   ├── train_codebook.json
-│   ├── test_codebook.json
-│   ├── poi_features.pt
-│   ├── metadata.json
-├── GWL/
-│   ├── train_codebook.json
-│   ├── test_codebook.json
-│   ├── poi_features.pt
-│   ├── metadata.json
-```
-
-
-## Visualization & Metrics Scripts
-
-- `scripts/evaluate/visualization/unique_collision_calculation.py`  
-  ```bash
-  uv run scripts/evaluate/visualization/unique_collision_calculation.py --local-file path/to/codebook.csv
-  ```
-  Omitting `--local-file` will download the predefined Hugging Face datasets listed in the script.
-
-- `scripts/evaluate/visualization/test.ipynb`  
-  Open in Jupyter / VS Code and run top-to-bottom. The first cell downloads the NYC data; adjust `target_path` or `model_name` if needed.
-
-- `scripts/evaluate/visualization/test_cat_region.ipynb`  
-  Same workflow as `test.ipynb`, but focused on category/region analysis. Run each cell sequentially after the data download cell finishes.
-
-- `scripts/evaluate/visualization/test_region.ipynb`  
-  Notebook for SID prefix vs. region visualizations. Update `target_path`/`model_name` if you want another dataset, then run cells in order.
-  
-### Dataset
-All datasets should be placed under `datasets` directory. We can download the datasets from Hugging Face by `uv run scripts/download_datasets.py`.
+1. See `scripts/rqvae/inference_rqvae.py` for the API of encoding POI sids.
+2. See `scripts/llm/inference_llm.py` for the API of LLM inference.
+3. See `scripts/llm/train_llm_ddp_batch.py` for the API of training LLM.
+4. See `scripts/rqvae/train_rqvae.py` for the API of training RQVAE.

@@ -1,7 +1,7 @@
 """
 Run command (We need to activate the virtual environment to ensure torchrun available):
 source .venv/bin/activate
-python scripts/train_llm/train_llm_batch.py
+python scripts/llm/train_llm_ddp_batch.py
 
 """
 
@@ -9,8 +9,14 @@ from poi import settings
 from poi.llm.ddp_utils import CreateRunBatchItem, create_run_batch
 from poi.llm.trainer import train_llm_ddp_batch
 
+NYC_OLD_DS = settings.DATASETS_DIR / "NYC" / "LLM Dataset"
+TKY_OLD_DS = settings.DATASETS_DIR / "TKY" / "LLM Dataset"
+
 NYC_DS = settings.DATASETS_DIR / "NYC" / "New LLM Dataset"
 TKY_DS = settings.DATASETS_DIR / "TKY" / "New LLM Dataset"
+
+NYC_EXP_DS = settings.DATASETS_DIR / "NYC_Exploration" / "LLM Dataset"
+TKY_EXP_DS = settings.DATASETS_DIR / "TKY_Exploration" / "LLM Dataset"
 
 ########################################################
 ### List of runs to train
@@ -47,6 +53,14 @@ RUN_ITEMS: list[CreateRunBatchItem] = [
         run_name="new-llama3-nyc-kl",
         dataset_dir=NYC_DS / "Nrqvae-withKL-NYC-div0.25-commit0.25-lr1e-3",
     ),
+    CreateRunBatchItem(
+        run_name="new-llama3-nyc-exploration-base",
+        dataset_dir=NYC_EXP_DS / "Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3",
+    ),
+    CreateRunBatchItem(
+        run_name="llama3-nyc-no-sid",
+        dataset_dir=NYC_OLD_DS / "ablation without SID",
+    ),
     ###########
     # TKY
     ##########
@@ -78,6 +92,14 @@ RUN_ITEMS: list[CreateRunBatchItem] = [
         run_name="new-llama3-tky-kl",
         dataset_dir=TKY_DS / "Nrqvae-withKL-TKY-div0.25-commit0.25-lr1e-3",
     ),
+    CreateRunBatchItem(
+        run_name="new-llama3-tky-exploration-base",
+        dataset_dir=TKY_EXP_DS / "Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3",
+    ),
+    CreateRunBatchItem(
+        run_name="llama3-tky-no-sid",
+        dataset_dir=TKY_OLD_DS / "ablation without SID",
+    ),
 ]
 
 ########################################################
@@ -89,10 +111,10 @@ GRADIENT_ACCUMULATION_STEPS = 2
 DO_DDP = True
 DO_EVAL = True
 MAX_EXAMPLES = None
-PUSH_TO_HUB = True
-FORCE_PUSH = False
+PUSH_TO_HUB = False # Do not push
+FORCE_PUSH = True
 
-SCRIPT_PATH = settings.ROOT_DIR / "scripts/train_llm/train_llm_ddp_single.py"
+SCRIPT_PATH = settings.ROOT_DIR / "scripts/llm/train_llm_ddp_single.py"
 NPROC_PER_NODE = 8
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-This repo is for the implementation project of COMP5331, 2025 Fall. The original paper is **Generative Next POI Recommendation with Semantic ID**. All trained RQ-VAE models and finetuned LLaMA3-8B model lora are available on Hugging Face organization [comp5331poi](https://huggingface.co/comp5331poi).
+This repo is for the implementation project of COMP5331, 2025 Fall. The original paper is **Generative Next POI Recommendation with Semantic ID**. All datasets, trained RQ-VAE models and finetuned LLaMA3-8B model lora are available on Hugging Face organization [comp5331poi](https://huggingface.co/comp5331poi).
 
 ## Evaluation Results
 

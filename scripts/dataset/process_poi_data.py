@@ -22,7 +22,7 @@ def main():
         print("🔑 Using provided token...")
     else:
         print("⚠️  No token provided. Please provide your HF token as an argument:")
-        print("   python scripts/process_poi_data.py YOUR_TOKEN_HERE")
+        print("   python scripts/dataset/process_poi_data.py YOUR_TOKEN_HERE")
         print("   Or set HF_TOKEN environment variable")
         return
 

@@ -3,7 +3,7 @@ from poi.rqvae import RQVAEConfig
 from poi.rqvae.inference import encode_poi_sid, load_inference_model
 
 if __name__ == "__main__":
-    config = RQVAEConfig(run_name="Nrqvae-NYC-div0.00-commit0.25-lr1e-3", dataset_name="NYC", div_weight=0.0, commitment_weight=0.25)
+    config = RQVAEConfig(run_name="Nrqvae-NYC-div0.25-commit0.25-lr1e-3", dataset_name="NYC", div_weight=0.25, commitment_weight=0.25)
 
     model = load_inference_model(config, from_hub=True)
 

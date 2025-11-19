@@ -18,4 +18,4 @@ if __name__ == "__main__":
     print(f"Eval dataset size: {len(eval_dataset)} examples")
 
     # if push_to_hub is True, the model will be pushed to the Hugging Face hub repo, otherwise it will be saved to the local directory
-    train_full_llm_fast(config, train_dataset, eval_dataset, push_to_hub=True)
+    train_full_llm_fast(config, train_dataset, eval_dataset, push_to_hub=False)

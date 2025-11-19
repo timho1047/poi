@@ -10,10 +10,10 @@ USAGE:
    export HF_TOKEN="your_huggingface_token_here"
 
 2. Run the script:
-   uv run scripts/inference_rqvae.py
+   uv run scripts/dataset/inference_rqvae_batch.py
 
 3. Or run directly with token:
-   HF_TOKEN="your_token" uv run scripts/inference_rqvae.py
+   HF_TOKEN="your_token" uv run scripts/dataset/inference_rqvae_batch.py
 
 FUNCTIONALITY:
 - Performs batch inference on 10 pre-trained RQ-VAE models

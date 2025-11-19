@@ -6,10 +6,10 @@ This script provides a simple interface for checking and exploring
 models stored in the Hugging Face organization.
 
 Usage:
-    HF_TOKEN="Your HF Token" uv run scripts/check_all_hf_models.py
-    HF_TOKEN="Your HF Token" uv run scripts/check_all_hf_models.py --model rqvae-nyc-div0.1-commit0.5-lr5e-5
-    HF_TOKEN=“Your HF Token” uv run scripts/check_all_hf_models.py --filter rqvae
-    HF_TOKEN=“Your HF Token” uv run scripts/check_all_hf_models.py --filter llm
+    HF_TOKEN="Your HF Token" uv run scripts/dataset/check_all_hf_models.py
+    HF_TOKEN="Your HF Token" uv run scripts/dataset/check_all_hf_models.py --model rqvae-nyc-div0.1-commit0.5-lr5e-5
+    HF_TOKEN=“Your HF Token” uv run scripts/dataset/check_all_hf_models.py --filter rqvae
+    HF_TOKEN=“Your HF Token” uv run scripts/dataset/check_all_hf_models.py --filter llm
 """
 
 import argparse

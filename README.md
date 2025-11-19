@@ -1,3 +1,5 @@
+This repo is for the implementation project of COMP5331, 2025 Fall. The original paper is **Generative Next POI Recommendation with Semantic ID**.
+
 ## Evaluation Results
 
 The following LLMs are trained with 64 effective batch size, 1e-5 learning rate, 8 epochs with early stopping, lora rank 16, lora alpha 32, lora dropout 0.1, 4-bit quantization if not specified. The test models are trained using the processed dataset from the original paper. `Test Accuracy` is the main column we care about.
@@ -46,62 +48,50 @@ Using base models.
 
 ## Setup
 
-### Manage Dependencies and run scripts
-
-This repo use `uv` as package manager. `uv` is a tool that helps you manage the dependencies of your project, written in `rust`. It is much faster than `pip`, and use standard `pyproject.toml` file to manage the project (rather than `requirements.txt`). 
-
-`uv` is installed in this cloud instance already.
-
-To install the dependencies, run:
-
-```bash
-uv sync
-```
-
-To add a new dependency, run:
-```bash
-uv add <dependency>
-```
-
-To remove a dependency, run:
-```bash
-uv remove <dependency>
-```
-
-To run a python script, run:
-```bash
-uv run path/to/your/script.py
-```
-
-If you want to run a script using the local python manually without using `uv`, you can activate the virtual environment:
-```bash
-source .venv/bin/activate  # activate the virtual environment, 
-                           # you should see (poi) in the beginning 
-                           # of the prompt.
-
-python path/to/your/script.py
-```
-
-
-All dependencies listed in `pyproject.toml` will be installed in `.venv` (the virtual environment) directory.
-
-### Local Machine
-
-If you are using local machine, you can install `uv` via `pip` by running:
+This project use `uv` as package manager. You can install `uv` via `pip` by running:
 ```bash
 pip install uv
 ```
 
-Then you can use `uv` command to manage the dependencies as mentioned above.
-
-### Check GPU Utilization
-
-To check the GPU utilization (cuda), you can use the following command:
+If `uv` is installed, you can use `uv` command to install the dependencies.
 ```bash
-nvidia-smi # will show the GPU utilization of all GPUs
-nvidia-smi -l 1 # will show the GPU utilization of all GPUs every 1 second
+uv sync
+```
 
-nvtop # will show the GPU utilization in a prettier way, which can be exited by pressing `q`
+You can download all datasets to `datasets` directory by running:
+
+```bash
+uv run scripts/dataset/download_all.py
+```
+
+
+## Project structure
+
+- `src/poi`: The core library of the project.
+  - `src/poi/dataset`: Dataset processing and preparation.
+  - `src/poi/llm`: LLM training and inference.
+  - `src/poi/rqvae`: RQVAE model, training and inference.
+    - `src/poi/rqvae/model`: The core model of RQVAE.
+    - `src/poi/rqvae/train`: The training code of RQVAE.
+  - `src/poi/settings`: All global settings of the project.
+
+- `scripts`: All scripts of the project for performing tasks, including dataset downloading, LLM training, RQVAE training, etc.
+- `output`: All output files of the project, including model checkpoints and training logs.
+- `datasets`: All datasets of the project.
+
+
+## Excute
+Here are some main scripts for training, inference and evaluation.
+
+
+### Training
+```bash
+uv run scripts/llm/train_llm.py
+```
+
+### Inference
+```bash
+uv run scripts/llm/inference_llm.py
 ```
 
 ## Development Guidelines

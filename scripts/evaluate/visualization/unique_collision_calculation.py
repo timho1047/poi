@@ -128,7 +128,7 @@ def process_model(dataset_name: str, model_name: str) -> dict:
 def main():
     parser = argparse.ArgumentParser(
         description="Calculate unique SID count from codebook CSV files"
-    )
+    ) 
     parser.add_argument(
         '--local-file',
         type=str,
@@ -163,15 +163,21 @@ def main():
     # Define all models to process
     models = [
         # NYC models
-        ('NYC', 'rqvae-nyc-div0.0-commit0.5-lr5e-5'),
-        ('NYC', 'rqvae-nyc-div0.25-commit0.5-lr5e-5'),
-        ('NYC', 'rqvae-nyc-div0.5-commit0.5-lr5e-5'),
-        ('NYC', 'rqvae-nyc-div0.75-commit0.5-lr5e-5'),
+        # ('NYC', 'Nrqvae-NYC-div0.00-commit0.25-lr1e-3'),
+        # ('NYC', 'Nrqvae-NYC-div0.25-commit0.25-lr1e-3'),
+        # ('NYC', 'Nrqvae-NYC-div0.50-commit0.25-lr1e-3'),
+        # ('NYC', 'Nrqvae-NYC-div0.75-commit0.25-lr1e-3'),
+        # ('NYC', 'Nrqvae-withKL-NYC-div0.25-commit0.25-lr1e-3'),
+        # ('NYC', 'Nrqvae-without_L_quant-NYC-div0.25-commit0.25-lr1e-3'),
+        ('NYC_Exploration', 'Nrqvae-NYC_Exploration-div0.25-commit0.25-lr1e-3'),
         # TKY models
-        ('TKY', 'rqvae-tky-div0.0-commit0.25-lr5e-5'),
-        ('TKY', 'rqvae-tky-div0.25-commit0.25-lr5e-5'),
-        ('TKY', 'rqvae-tky-div0.5-commit0.25-lr5e-5'),
-        ('TKY', 'rqvae-tky-div0.75-commit0.25-lr5e-5'),
+        # ('TKY', 'Nrqvae-TKY-div0.00-commit0.25-lr1e-3'),
+        # ('TKY', 'Nrqvae-TKY-div0.25-commit0.25-lr1e-3'),
+        # ('TKY', 'Nrqvae-TKY-div0.50-commit0.25-lr1e-3'),
+        # ('TKY', 'Nrqvae-TKY-div0.75-commit0.25-lr1e-3'),
+        # ('TKY', 'Nrqvae-withKL-TKY-div0.25-commit0.25-lr1e-3'),
+        # ('TKY', 'Nrqvae-without_L_quant-TKY-div0.25-commit0.25-lr1e-3'),
+        ('TKY_Exploration', 'Nrqvae-TKY_Exploration-div0.25-commit0.25-lr1e-3'),
     ]
     
     print("🚀 Batch Processing Unique SID Calculation from Codebook CSV")

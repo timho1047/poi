@@ -158,5 +158,44 @@ train_rqvae(config)
 3. See `scripts/train_llm/train_llm.py` for the API of training LLM.
 4. See `scripts/train_rqvae.py` for the API of training RQVAE.
 
+### Dataset format
+All datasets should be placed under `datasets` directory in the following format (tentative):
+```
+datasets/
+├── NYC/
+│   ├── train_codebook.json
+│   ├── test_codebook.json
+│   ├── poi_features.pt
+│   ├── metadata.json
+├── TKY/
+│   ├── train_codebook.json
+│   ├── test_codebook.json
+│   ├── poi_features.pt
+│   ├── metadata.json
+├── GWL/
+│   ├── train_codebook.json
+│   ├── test_codebook.json
+│   ├── poi_features.pt
+│   ├── metadata.json
+```
+
+
+## Visualization & Metrics Scripts
+
+- `scripts/evaluate/visualization/unique_collision_calculation.py`  
+  ```bash
+  uv run scripts/evaluate/visualization/unique_collision_calculation.py --local-file path/to/codebook.csv
+  ```
+  Omitting `--local-file` will download the predefined Hugging Face datasets listed in the script.
+
+- `scripts/evaluate/visualization/test.ipynb`  
+  Open in Jupyter / VS Code and run top-to-bottom. The first cell downloads the NYC data; adjust `target_path` or `model_name` if needed.
+
+- `scripts/evaluate/visualization/test_cat_region.ipynb`  
+  Same workflow as `test.ipynb`, but focused on category/region analysis. Run each cell sequentially after the data download cell finishes.
+
+- `scripts/evaluate/visualization/test_region.ipynb`  
+  Notebook for SID prefix vs. region visualizations. Update `target_path`/`model_name` if you want another dataset, then run cells in order.
+  
 ### Dataset
 All datasets should be placed under `datasets` directory. We can download the datasets from Hugging Face by `uv run scripts/download_datasets.py`.

@@ -48,6 +48,8 @@ Using base models.
 
 ## Setup
 
+**Operating System: Linux**
+
 This project use `uv` as package manager. You can install `uv` via `pip` by running:
 ```bash
 pip install uv
